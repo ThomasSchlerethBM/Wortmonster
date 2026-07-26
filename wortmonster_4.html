@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WORTMONSTER – Die Rechtschreib-Liga</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+/* =====================================================================
+   Firebase (Realtime Database) – Projekt: deutsch-pokemon-regeln
+   Falls die Bestenliste leer bleibt: In der Firebase-Konsole unter
+   "Realtime Database" die echte URL ablesen und unten als ersten
+   Eintrag in DB_URLS setzen. Das Spiel probiert beide Varianten durch.
+   Regeln muessen erlauben:  "wortmonster": { ".read": true, ".write": true }
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDy-XII6w5zpC0BgiErIQDpf9Cg5mT1wK8",
+  authDomain:        "deutsch-pokemon-regeln.firebaseapp.com",
+  projectId:         "deutsch-pokemon-regeln",
+  storageBucket:     "deutsch-pokemon-regeln.firebasestorage.app",
+  messagingSenderId: "378282101063",
+  appId:             "1:378282101063:web:93aca6f0fe3ee0b273e462",
+  measurementId:     "G-JET2QXV5DZ"
+};
+const DB_URLS = [
+  "https://deutsch-pokemon-regeln-default-rtdb.europe-west1.firebasedatabase.app",
+  "https://deutsch-pokemon-regeln-default-rtdb.firebaseio.com"
+];
+const ELTERN_PIN = "2345";
+</script>
+<style>
+:root{
+  --night:#141033; --panel:#241c62; --panel2:#2e2478;
+  --lime:#9dff4f; --cyan:#3ce0ff; --magenta:#ff4fa3; --gold:#ffd23f;
+  --red:#ff5d5d; --ink:#0c0824; --paper:#f3efff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:'Baloo 2','Trebuchet MS',system-ui,sans-serif;background:var(--night);color:var(--paper);overflow-x:hidden}
+#stars{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+   radial-gradient(2px 2px at 12% 18%, #fff8 50%, transparent 51%),
+   radial-gradient(2px 2px at 78% 12%, #fff6 50%, transparent 51%),
+   radial-gradient(1px 1px at 33% 62%, #fff7 50%, transparent 51%),
+   radial-gradient(2px 2px at 62% 78%, #fff5 50%, transparent 51%),
+   radial-gradient(1px 1px at 88% 55%, #fff6 50%, transparent 51%),
+   radial-gradient(1200px 700px at 50% -10%, #3a2a9b 0%, transparent 70%),
+   linear-gradient(180deg,#141033 0%,#0d0a24 100%)}
+.wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:14px 14px 40px}
+.screen{display:none;animation:pop .28s ease}
+.screen.on{display:block}
+@keyframes pop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+h1.logo{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(30px,9vw,54px);
+  letter-spacing:.14em;text-align:center;margin:18px 0 2px;line-height:1;
+  background:linear-gradient(180deg,#fff 10%,var(--cyan) 45%,var(--magenta) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{text-align:center;color:#b9aef7;letter-spacing:.28em;font-size:12px;text-transform:uppercase;margin-bottom:18px}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:3px solid #4a3ab8;border-radius:22px;
+  padding:16px;margin-bottom:14px;box-shadow:0 8px 0 #170f45,0 14px 30px rgba(0,0,0,.45)}
+.card h2{margin:0 0 8px;font-size:22px;color:var(--gold)}
+.card p{margin:0 0 10px;color:#d9d2ff;font-size:16px;line-height:1.45}
+.btn{display:block;width:100%;border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:19px;
+  color:var(--ink);background:linear-gradient(180deg,var(--lime),#6fd41f);border-radius:16px;padding:14px 16px;
+  margin:8px 0;box-shadow:0 6px 0 #3f8a0f;transition:.08s}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #3f8a0f}
+.btn.alt{background:linear-gradient(180deg,var(--cyan),#12a9d6);box-shadow:0 6px 0 #0b6f8d}
+.btn.gold{background:linear-gradient(180deg,var(--gold),#e0a80c);box-shadow:0 6px 0 #96700a}
+.btn.ghost{background:#3b2f92;color:#e6e0ff;box-shadow:0 6px 0 #221a63}
+.btn:disabled{opacity:.45;box-shadow:none;transform:none;cursor:default}
+.row{display:flex;gap:10px}
+.row .btn{flex:1}
+input[type=text]{width:100%;padding:14px;border-radius:14px;border:3px solid #4a3ab8;background:#1a1450;
+  color:#fff;font-family:inherit;font-size:19px;font-weight:700;outline:none}
+input[type=text]:focus{border-color:var(--cyan)}
+.mon{display:block;margin:0 auto;filter:drop-shadow(0 8px 12px rgba(0,0,0,.5))}
+.mon.idle{animation:bob 2.2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.mon.hit{animation:shake .35s}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-12px) rotate(-5deg)}40%{transform:translateX(10px) rotate(4deg)}60%{transform:translateX(-6px)}}
+.mon.attack{animation:lunge .35s}
+@keyframes lunge{50%{transform:translateY(-18px) scale(1.08)}}
+.starters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.starter{background:#1c1556;border:3px solid #4a3ab8;border-radius:18px;padding:8px 4px;text-align:center;cursor:pointer}
+.starter.sel{border-color:var(--lime);background:#2a2170}
+.starter b{display:block;font-size:15px;margin-top:2px}
+.starter small{color:#a99ff0;font-size:11px}
+.arenaList{display:grid;gap:9px}
+.arena{display:flex;align-items:center;gap:10px;background:#1e1760;border:3px solid #4a3ab8;border-radius:18px;
+  padding:8px 11px;cursor:pointer}
+.arena.locked{opacity:.4;cursor:default}
+.arena.done{border-color:var(--gold)}
+.arena .no{font-family:'Space Grotesk';font-size:12px;color:#8f83e0;width:22px;text-align:center}
+.arena .t{flex:1;min-width:0}
+.arena .t b{display:block;font-size:17px}
+.arena .t small{color:#b3a9f5;font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:22px}
+.field{display:flex;justify-content:space-between;align-items:flex-end;gap:6px;
+  background:radial-gradient(120% 90% at 50% 0%, #3b2f9e 0%, #1a1352 70%);border:3px solid #4a3ab8;
+  border-radius:22px;padding:10px;margin-bottom:12px;min-height:230px}
+.side{width:49%;text-align:center}
+.nameplate{background:#0f0a35;border:2px solid #5645cf;border-radius:12px;padding:5px 7px;margin-bottom:6px}
+.nameplate b{font-size:14.5px;display:block;line-height:1.1}
+.nameplate small{font-size:11px;color:var(--gold)}
+.hpbar{height:11px;background:#000;border-radius:99px;overflow:hidden;margin-top:4px;border:1px solid #5645cf}
+.hpfill{height:100%;background:linear-gradient(90deg,var(--lime),#5ecb18);transition:width .45s ease}
+.hpfill.mid{background:linear-gradient(90deg,var(--gold),#e0a80c)}
+.hpfill.low{background:linear-gradient(90deg,var(--red),#c22)}
+.evoline{font-size:11px;color:#bdb2ff;margin-top:4px;line-height:1.2}
+.evobar{height:6px;background:#0f0a35;border-radius:99px;overflow:hidden;margin-top:3px;border:1px solid #5645cf}
+.evobar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--magenta))}
+.qbox{background:var(--paper);color:var(--ink);border-radius:20px;padding:14px;border:3px solid #4a3ab8;box-shadow:0 8px 0 #170f45}
+.qbox .tag{display:inline-block;background:#1d1750;color:var(--lime);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;padding:3px 9px;border-radius:99px;margin-bottom:8px}
+.qbox .q{font-size:21px;font-weight:800;line-height:1.3;margin-bottom:12px}
+.opts{display:grid;gap:8px}
+.opt{width:100%;text-align:left;font-family:inherit;font-weight:700;font-size:18px;background:#fff;
+  border:3px solid #cfc4f5;border-radius:14px;padding:12px 14px;cursor:pointer;box-shadow:0 4px 0 #cfc4f5;color:var(--ink)}
+.opt.right{background:#d8ffb8;border-color:#6fd41f;box-shadow:0 4px 0 #6fd41f}
+.opt.wrong{background:#ffd6d6;border-color:var(--red);box-shadow:0 4px 0 var(--red)}
+.tip{margin-top:10px;background:#efe8ff;border-left:6px solid var(--magenta);border-radius:10px;padding:10px 12px;font-size:16px}
+.tip b{color:#a4126a}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:90;background:var(--gold);color:var(--ink);
+  font-weight:800;padding:10px 18px;border-radius:99px;box-shadow:0 6px 0 #b8890a;font-size:17px}
+.dexGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px}
+.dexItem{background:#1c1556;border:3px solid #4a3ab8;border-radius:16px;padding:8px 4px;text-align:center}
+.dexItem b{display:block;font-size:13px}
+.dexItem small{color:#a99ff0;font-size:10.5px}
+.dexItem.empty{opacity:.3}
+.stat{display:flex;justify-content:space-between;font-size:15px;color:#cdc4ff;padding:3px 0;border-bottom:1px dashed #4a3ab8}
+.teamRow{display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.slot{background:#1c1556;border:2px solid #4a3ab8;border-radius:12px;padding:4px 6px;text-align:center;min-width:78px;cursor:pointer}
+.slot.act{border-color:var(--lime)}
+.slot b{display:block;font-size:12px}
+.slot small{font-size:10px;color:var(--gold)}
+.intro{position:fixed;inset:0;z-index:70;background:rgba(9,6,32,.96);display:flex;align-items:center;justify-content:center;padding:18px}
+.introBox{max-width:440px;width:100%;background:linear-gradient(180deg,var(--panel),var(--panel2));border:3px solid var(--cyan);
+  border-radius:24px;padding:20px;text-align:center;box-shadow:0 10px 0 #170f45}
+.introBox h2{color:var(--cyan);margin:6px 0 4px;font-size:26px}
+.introBox p{color:#ded8ff;font-size:17px;line-height:1.5;margin:0 0 6px}
+.dots{display:flex;gap:7px;justify-content:center;margin:12px 0 4px}
+.dots i{width:9px;height:9px;border-radius:99px;background:#4a3ab8;display:block}
+.dots i.on{background:var(--lime);width:22px}
+.skip{background:none;border:none;color:#9c92e8;font-family:inherit;font-size:15px;text-decoration:underline;cursor:pointer;padding:8px}
+.evo{position:fixed;inset:0;z-index:60;background:rgba(10,6,35,.94);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;text-align:center;padding:20px}
+.evo h2{font-size:30px;color:var(--gold);margin:0}
+.flash{animation:flash 1.6s ease}
+@keyframes flash{0%{filter:brightness(1)}45%,55%{filter:brightness(6) saturate(0)}100%{filter:brightness(1)}}
+.modal{position:fixed;inset:0;z-index:80;background:rgba(9,6,32,.9);display:flex;align-items:center;justify-content:center;padding:16px}
+.modalBox{max-width:460px;width:100%;background:var(--paper);color:var(--ink);border:4px solid var(--red);
+  border-radius:24px;padding:18px;box-shadow:0 12px 0 #7a1730;max-height:92vh;overflow:auto}
+.modalBox h2{margin:0 0 4px;font-size:24px;color:#b0132c}
+.modalBox .qtext{font-weight:800;font-size:18px;margin:10px 0 8px;line-height:1.3}
+.answerLine{display:flex;gap:8px;font-size:17px;padding:8px 10px;border-radius:12px;margin-bottom:6px;font-weight:700}
+.answerLine.no{background:#ffd6d6}
+.answerLine.yes{background:#d8ffb8}
+.why{background:#efe8ff;border-left:6px solid var(--magenta);border-radius:10px;padding:11px 13px;font-size:16px;margin:10px 0}
+.why b{display:block;color:#a4126a}
+.how{background:#e4f6ff;border-left:6px solid #0d84c0;border-radius:10px;padding:11px 13px;font-size:16px;margin-bottom:12px}
+.how b{display:block;color:#0d6796}
+.bl{display:flex;align-items:center;gap:10px;background:#1c1556;border:2px solid #4a3ab8;border-radius:14px;padding:9px 12px;margin-bottom:7px}
+.bl .rk{font-family:'Space Grotesk';font-size:19px;width:34px;color:var(--gold);text-align:center}
+.bl .nm{flex:1;font-weight:700;font-size:17px;min-width:0}
+.bl .pt{font-weight:800;color:var(--lime);font-size:18px}
+.bl.me{border-color:var(--lime);background:#25206b}
+.bl small{display:block;color:#a99ff0;font-size:12px;font-weight:500}
+.rule{background:#1c1556;border:2px solid #4a3ab8;border-radius:14px;padding:10px 12px;margin-bottom:8px}
+.rule .top{display:flex;justify-content:space-between;gap:8px}
+.bar{height:9px;background:#0f0a35;border-radius:99px;overflow:hidden;margin-top:6px;border:1px solid #5645cf}
+.bar i{display:block;height:100%}
+.rule .hint{font-size:14px;color:#c6bdff;margin-top:7px;line-height:1.4}
+.rule .hint em{color:var(--gold);font-style:normal;font-weight:700}
+.pill{display:inline-block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-left:6px}
+.pill.ok{background:#1f5c12;color:#b8ff86}
+.pill.mid{background:#6b5306;color:#ffe08a}
+.pill.bad{background:#7a1730;color:#ffb3c4}
+.pinRow{display:flex;gap:8px}
+.msg{font-weight:700;margin-top:8px;font-size:15px;line-height:1.4}
+.msg.ok{color:var(--lime)}
+.msg.err{color:var(--red)}
+.monWrap{position:relative;display:inline-block;line-height:0}
+.stageChip{position:absolute;right:0;bottom:2px;background:#0f0a35;border:2px solid var(--gold);
+  color:var(--gold);font-size:11px;font-weight:800;padding:1px 7px;border-radius:99px;line-height:1.5;
+  box-shadow:0 2px 0 rgba(0,0,0,.4)}
+.stageChip.max{border-color:var(--lime);color:var(--lime)}
+.mapBox{background:#120e30;border:3px solid #4a3ab8;border-radius:22px;padding:6px;margin-bottom:14px;
+  box-shadow:0 8px 0 #170f45}
+.mapBox svg{display:block;width:100%;height:auto}
+.viewToggle{display:flex;gap:8px;margin-bottom:12px}
+.viewToggle button{flex:1;font-family:inherit;font-weight:800;font-size:16px;padding:11px;border-radius:14px;
+  border:3px solid #4a3ab8;background:#241c62;color:#b9aef7;cursor:pointer}
+.viewToggle button.on{background:var(--cyan);color:var(--ink);border-color:var(--cyan)}
+.opts3{display:grid;gap:8px;margin-bottom:4px}
+.optRow{display:flex;align-items:center;gap:10px;background:#1c1556;border:3px solid #4a3ab8;
+  border-radius:16px;padding:9px 12px;cursor:pointer}
+.optRow.on{border-color:var(--lime);background:#25206b}
+.optRow .ic{font-size:22px;width:26px;text-align:center}
+.optRow .tx{flex:1;min-width:0}
+.optRow .tx b{display:block;font-size:16px}
+.optRow .tx small{color:#a99ff0;font-size:12.5px;display:block;line-height:1.25}
+.sw{width:50px;height:28px;border-radius:99px;background:#0f0a35;border:2px solid #5645cf;position:relative;flex:none}
+.optRow.on .sw{background:var(--lime);border-color:var(--lime)}
+.sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#8f83e0;transition:.15s}
+.optRow.on .sw i{left:26px;background:#0f0a35}
+.regelList{list-style:none;padding:0;margin:0 0 12px}
+.regelList li{background:#1c1556;border-left:6px solid var(--cyan);border-radius:10px;padding:10px 13px;
+  margin-bottom:7px;font-size:17px;line-height:1.4;color:#e6e1ff}
+.speak{background:linear-gradient(180deg,#b57cff,#7a3fd6);box-shadow:0 6px 0 #4b1f92;color:#fff}
+.foot{text-align:center;color:#6f64bb;font-size:12px;margin-top:18px;letter-spacing:.1em}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div id="stars"></div>
+<div class="wrap">
+
+<section id="s-title" class="screen on">
+  <h1 class="logo">WORTMONSTER</h1>
+  <div class="sub">Die Rechtschreib-Liga</div>
+  <div style="text-align:center" id="titleMon"></div>
+  <div class="card">
+    <p>30 Arenen, 30 Monster. Jedes Monster gehört zu einer Rechtschreibregel und wird stärker, je besser du sie kannst.</p>
+    <button class="btn" onclick="newGame()">Neues Spiel starten</button>
+    <button class="btn alt" id="btnContinue" onclick="continueGame()" style="display:none">Weiterspielen</button>
+    <button class="btn ghost" onclick="openLoad()">Gespeicherten Spielstand laden</button>
+    <div class="row">
+      <button class="btn ghost" onclick="openBoard()">Bestenliste</button>
+      <button class="btn ghost" onclick="startIntro(true)">Anleitung</button>
+    </div>
+    <button class="btn ghost" onclick="openParent()">Elternbereich</button>
+  </div>
+  <div class="card"><h2>Einstellungen</h2><div class="opts3" id="optsTitel"></div></div>
+  <div class="foot">Für Klasse 2 – 4</div>
+</section>
+
+<section id="s-start" class="screen">
+  <div class="card"><h2>Wie heißt du?</h2>
+    <input type="text" id="trainerName" maxlength="14" placeholder="Dein Name" autocomplete="off"></div>
+  <div class="card"><h2>Wähle dein erstes Monster</h2>
+    <p>Alle drei sind gleich stark.</p>
+    <div class="starters" id="starterBox"></div>
+    <button class="btn" id="btnGo" onclick="confirmStarter()" disabled>Los geht's!</button></div>
+</section>
+
+<section id="s-map" class="screen">
+  <div class="card" style="padding-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div><h2 style="margin:0" id="mapName">Trainer</h2><small style="color:#b3a9f5" id="mapBadges"></small></div>
+      <button class="btn ghost" style="width:auto;margin:0;padding:10px 14px;font-size:15px" onclick="show('s-dex');renderDex()">Wortdex</button>
+    </div>
+    <div class="teamRow" id="teamRow"></div>
+    <div id="evoHint" style="font-size:14px;color:#cdc4ff;text-align:center;margin-top:8px"></div>
+  </div>
+  <div class="card" style="padding:12px"><div class="opts3" id="optsKarte"></div></div>
+  <div class="viewToggle">
+    <button id="tabKarte" onclick="setView('karte')">🗺️ Weltkarte</button>
+    <button id="tabListe" onclick="setView('liste')">☰ Liste</button>
+  </div>
+  <div class="mapBox" id="worldMap"></div>
+  <div class="arenaList" id="arenaList"></div>
+  <button class="btn gold" onclick="openBoard()">In die Bestenliste eintragen</button>
+  <button class="btn ghost" onclick="saveGame(true);show('s-title')">Speichern & zum Titel</button>
+</section>
+
+<section id="s-regel" class="screen">
+  <div class="card">
+    <div style="text-align:center" id="regelMon"></div>
+    <h2 id="regelTitel"></h2>
+    <p id="regelSub"></p>
+    <ul class="regelList" id="regelListe"></ul>
+    <div class="tip" style="color:var(--ink)" id="regelTrick"></div>
+    <button class="btn speak" onclick="regelVorlesen()">🔊 Regel vorlesen</button>
+    <button class="btn" onclick="startArena(REGEL_I)">Kampf starten</button>
+    <button class="btn ghost" onclick="stopSprich();renderMap();show('s-map')">Zurück zur Karte</button>
+  </div>
+</section>
+
+<section id="s-battle" class="screen">
+  <div class="field"><div class="side" id="sidePlayer"></div><div class="side" id="sideEnemy"></div></div>
+  <div class="qbox" id="qbox"></div>
+</section>
+
+<section id="s-result" class="screen"><div class="card" id="resultCard"></div></section>
+
+<section id="s-load" class="screen">
+  <div class="card"><h2>Spielstand laden</h2>
+    <p>Diese Spielstände wurden in der Cloud gesichert.</p>
+    <div id="loadList"></div></div>
+  <button class="btn alt" onclick="show('s-title')">Zurück</button>
+</section>
+
+<section id="s-board" class="screen">
+  <div class="card">
+    <h2>Jetzt eintragen</h2>
+    <p>Trage deinen Punktestand in die Bestenliste ein. Du kannst das so oft machen, wie du willst – dein bester Stand bleibt stehen.</p>
+    <input type="text" id="boardName" maxlength="14" placeholder="Dein Name" autocomplete="off">
+    <div id="boardPunkte" style="text-align:center;font-size:28px;font-weight:800;color:var(--lime);margin:10px 0"></div>
+    <button class="btn gold" id="btnEintragen" onclick="eintragen()">In die Bestenliste eintragen</button>
+    <div id="boardMsg" class="msg"></div>
+  </div>
+  <div class="card"><h2>Bestenliste</h2>
+    <p id="boardInfo"></p><div id="boardList"></div>
+    <button class="btn ghost" onclick="openBoard()">Liste neu laden</button></div>
+  <button class="btn alt" onclick="G?show('s-map'):show('s-title')">Zurück</button>
+</section>
+
+<section id="s-dex" class="screen">
+  <div class="card"><h2>Wortdex</h2><p id="dexCount"></p><div class="dexGrid" id="dexGrid"></div></div>
+  <div class="card"><h2>Dein Team</h2><div id="teamDetail"></div></div>
+  <button class="btn alt" onclick="show('s-map')">Zurück zur Karte</button>
+</section>
+
+<section id="s-parent" class="screen">
+  <div class="card" id="pinCard"><h2>Elternbereich</h2>
+    <p>Auswertung, welche Regeln noch schwerfallen. Bitte PIN eingeben.</p>
+    <div class="pinRow"><input type="text" id="pinInput" maxlength="4" inputmode="numeric" placeholder="••••">
+      <button class="btn" style="width:auto;margin:0;padding:14px 20px" onclick="checkPin()">OK</button></div>
+    <div id="pinMsg" class="msg err"></div></div>
+  <div id="parentBody"></div>
+  <button class="btn alt" onclick="show('s-title')">Zurück</button>
+</section>
+
+</div>
+
+<script>
+/* ============ MONSTER-GRAFIK – waechst mit jeder Entwicklungsstufe ============ */
+const STAGE_SCALE = [1, 1.28, 1.62];
+
+function bodyPath(shape, c, c2){
+  switch(shape){
+    case 'spike':   return `<path d="M65 26 L114 120 L16 120 Z" fill="${c}" stroke="${c2}" stroke-width="5" stroke-linejoin="round"/>`;
+    case 'round':   return `<circle cx="65" cy="82" r="47" fill="${c}"/>`;
+    case 'tall':    return `<rect x="24" y="34" width="82" height="92" rx="27" fill="${c}"/>`;
+    case 'star':    return `<path d="M65 26 L83 64 L124 69 L94 97 L102 136 L65 116 L28 136 L36 97 L6 69 L47 64 Z" fill="${c}"/>`;
+    case 'drop':    return `<path d="M65 24 C100 62 112 84 112 98 A47 47 0 0 1 18 98 C18 84 30 62 65 24 Z" fill="${c}"/>`;
+    case 'crystal': return `<path d="M65 22 L106 62 L92 124 L38 124 L24 62 Z" fill="${c}" stroke="${c2}" stroke-width="4" stroke-linejoin="round"/>`;
+    case 'beast':   return `<path d="M20 92 Q22 44 65 44 Q108 44 110 92 Q112 126 65 126 Q18 126 20 92 Z" fill="${c}"/>`;
+    default:        return `<ellipse cx="65" cy="86" rx="49" ry="43" fill="${c}"/>`;
+  }
+}
+function monSVG(m, base){
+  base = base || 120;
+  const s = m.stage, c = m.col, c2 = m.col2;
+  const size = Math.round(base * STAGE_SCALE[s-1]);
+  let extra = '', eyeEls = '';
+
+  if(s >= 2){ // Hoerner und Rueckenstacheln
+    extra += `<path d="M32 44 L22 12 L48 34 Z" fill="${c2}"/><path d="M98 44 L108 12 L82 34 Z" fill="${c2}"/>`;
+    extra += `<path d="M65 30 L57 6 L73 6 Z" fill="${c2}" opacity=".9"/>`;
+  }
+  if(s === 3){ // Fluegel, Krone und Aura
+    extra = `<circle cx="65" cy="82" r="70" fill="${c}" opacity=".13"/>
+             <path d="M18 56 Q-16 78 6 118 Q26 104 30 82 Z" fill="${c2}"/>
+             <path d="M112 56 Q146 78 124 118 Q104 104 100 82 Z" fill="${c2}"/>` + extra +
+            `<path d="M40 22 L48 2 L58 18 L65 -4 L72 18 L82 2 L90 22 Z" fill="${'#ffd23f'}"/>`;
+  }
+  if(s === 3){
+    eyeEls = `<circle cx="45" cy="76" r="10" fill="#fff"/><circle cx="65" cy="64" r="10" fill="#fff"/><circle cx="85" cy="76" r="10" fill="#fff"/>
+              <circle cx="46" cy="78" r="5.5" fill="#12102e"/><circle cx="66" cy="66" r="5.5" fill="#12102e"/><circle cx="86" cy="78" r="5.5" fill="#12102e"/>`;
+  } else {
+    eyeEls = `<circle cx="52" cy="76" r="11" fill="#fff"/><circle cx="78" cy="76" r="11" fill="#fff"/>
+              <circle cx="54" cy="78" r="6" fill="#12102e"/><circle cx="80" cy="78" r="6" fill="#12102e"/>`;
+  }
+  const mouth = s === 3
+    ? `<path d="M48 100 Q65 118 82 100 Z" fill="#12102e"/>`
+    : `<path d="M54 100 Q65 110 76 100" stroke="#12102e" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+
+  return `<svg class="mon idle" width="${size}" height="${size}" viewBox="-20 -12 170 155" xmlns="http://www.w3.org/2000/svg">
+    ${extra}${bodyPath(m.shape,c,c2)}
+    <ellipse cx="65" cy="130" rx="36" ry="7" fill="rgba(0,0,0,.28)"/>
+    ${eyeEls}${mouth}
+    <text x="65" y="54" font-size="18" font-family="Space Grotesk,sans-serif" font-weight="700"
+      text-anchor="middle" fill="${c2}" opacity=".85">${m.rune}</text>
+  </svg>`;
+}
+
+/* ============ 30 MONSTERFAMILIEN ============ */
+const FAMILIES = {
+ abc:     {names:['Abecko','Abeckor','Abecktron'],           col:'#7ce04a',col2:'#2f7d12',shape:'blob',   rune:'ABC',el:'Alphabet'},
+ laute:   {names:['Lautelu','Lautaris','Lautagon'],          col:'#ff9f43',col2:'#a3520c',shape:'round',  rune:'aeiou',el:'Laute'},
+ silb:    {names:['Silbio','Silbaro','Silbatron'],           col:'#4fe0b8',col2:'#0c7a5e',shape:'blob',   rune:'Si', el:'Silben'},
+ vokal:   {names:['Vokalix','Vokalura','Vokalossus'],        col:'#ffd23f',col2:'#a37800',shape:'drop',   rune:'a–ā',el:'Vokallänge'},
+ nomen:   {names:['Nominus','Nominar','Nominarch'],          col:'#ff4fa3',col2:'#9c0f56',shape:'round',  rune:'N',  el:'Nomen'},
+ artikel: {names:['Artikuli','Artikuro','Artikulon'],        col:'#8ab4ff',col2:'#1c47a8',shape:'tall',   rune:'der',el:'Artikel'},
+ mehrzahl:{names:['Pluralo','Pluranor','Pluradrax'],         col:'#b57cff',col2:'#5a26a8',shape:'beast',  rune:'die',el:'Mehrzahl'},
+ einzahl: {names:['Singulu','Singulor','Singulith'],         col:'#ff7a4f',col2:'#a8320c',shape:'crystal',rune:'1',  el:'Einzahl'},
+ zusammen:{names:['Kompo','Komporex','Kompogantus'],         col:'#5ad1ff',col2:'#0d6796',shape:'spike',  rune:'+',  el:'Wortzusammensetzung'},
+ verb:    {names:['Verbino','Verbaro','Verbatron'],          col:'#4fc9ff',col2:'#0d5f96',shape:'beast',  rune:'-en',el:'Verben'},
+ person:  {names:['Persono','Personar','Personarch'],        col:'#ffb0d8',col2:'#a32b6c',shape:'blob',   rune:'ich',el:'Personalform'},
+ adjektiv:{names:['Adjekti','Adjektor','Adjektarion'],       col:'#a0ff9f',col2:'#1e7d1c',shape:'star',   rune:'wie',el:'Adjektive'},
+ satz:    {names:['Satzu','Satzuro','Satzumaro'],            col:'#ffffff',col2:'#5645cf',shape:'star',   rune:'!?', el:'Satzarten'},
+ zeichen: {names:['Punkti','Punktaro','Punktarox'],          col:'#ff6b6b',col2:'#8e1010',shape:'round',  rune:'. ? !',el:'Satzzeichen'},
+ grossa:  {names:['Majuska','Majuskor','Majuskaron'],        col:'#ffe066',col2:'#a37800',shape:'crystal',rune:'A',  el:'Satzanfang'},
+ stamm:   {names:['Stammel','Stammaro','Stammagon'],         col:'#8fd14f',col2:'#3a6b12',shape:'beast',  rune:'√',  el:'Wortstamm'},
+ baustein:{names:['Bausto','Baustaro','Baustatron'],         col:'#c0c8ff',col2:'#2f2a8a',shape:'crystal',rune:'ver',el:'Wortbausteine'},
+ trenn:   {names:['Trennix','Trennador','Trennarok'],        col:'#ff8f4f',col2:'#a8320c',shape:'spike',  rune:'ck', el:'ck & tz'},
+ zeile:   {names:['Zeilix','Zeilaro','Zeilatron'],           col:'#63e6be',col2:'#0b7a5c',shape:'tall',   rune:'-',  el:'Trennen'},
+ dehn:    {names:['Dehnaro','Dehnarion','Dehnarax'],         col:'#4fc9ff',col2:'#0d5f96',shape:'tall',   rune:'h',  el:'Dehnungs-h'},
+ ie:      {names:['Ielo','Ielaro','Ielagon'],                col:'#74c0fc',col2:'#14508f',shape:'drop',   rune:'ie', el:'ie oder i'},
+ dopp:    {names:['Doppelix','Doppelon','Doppelgantus'],     col:'#ffd43b',col2:'#a37800',shape:'round',  rune:'mm', el:'Doppelmitlaute'},
+ lang:    {names:['Verlängro','Verlängus','Verlängrax'],     col:'#b57cff',col2:'#5a26a8',shape:'tall',   rune:'+er',el:'Verlängern'},
+ aeae:    {names:['Ämli','Ämlaro','Ämladrax'],               col:'#69db7c',col2:'#1d6b2c',shape:'blob',   rune:'ä',  el:'ä von a'},
+ aeu:     {names:['Äulix','Äularo','Äuladon'],               col:'#38d9a9',col2:'#0b6b52',shape:'drop',   rune:'äu', el:'äu von au'},
+ esszet:  {names:['Eszetto','Eszettor','Eszettarox'],        col:'#e599f7',col2:'#7a2b96',shape:'crystal',rune:'ß',  el:'ß und ss'},
+ merkv:   {names:['Merkuli','Merkuria','Merkuragon'],        col:'#dee2ff',col2:'#2f2a8a',shape:'blob',   rune:'V',  el:'Merkwörter'},
+ liste1:  {names:['Listor','Listaro','Listatron'],           col:'#ffa8a8',col2:'#96262b',shape:'beast',  rune:'A–L',el:'Wörterliste A–L'},
+ liste2:  {names:['Lexi','Lexaro','Lexagon'],                col:'#99e9f2',col2:'#0b6478',shape:'beast',  rune:'M–Z',el:'Wörterliste M–Z'},
+ meister: {names:['Wortarch','Wortarion','Wortimperus'],     col:'#ffd700',col2:'#8e5b00',shape:'star',   rune:'★',  el:'Meister'}
+};
+function makeMon(fam, level){
+  const f = FAMILIES[fam] || FAMILIES.silb;
+  const stage = level >= 10 ? 3 : (level >= 5 ? 2 : 1);
+  return {fam, level, stage, name:f.names[stage-1], col:f.col, col2:f.col2, shape:f.shape, rune:f.rune, el:f.el};
+}
+function maxHP(level){ return 42 + level*9; }
+// Monster mit kleiner Stufenanzeige, z. B. 2/3
+function monBox(m, size){
+  return `<div class="monWrap">${monSVG(m,size)}<span class="stageChip${m.stage===3?' max':''}">${m.stage}/3</span></div>`;
+}
+
+/* ============ WORTMATERIAL AUS DER WÖRTERLISTE ============ */
+const WORDS = [
+["der","Abend","Abende"],["die","Ameise","Ameisen"],["die","Ampel","Ampeln"],["der","Apfel","Äpfel"],
+["der","Ast","Äste"],["die","Aufgabe","Aufgaben"],["das","Auge","Augen"],["das","Auto","Autos"],
+["das","Baby","Babys"],["der","Ball","Bälle"],["die","Bank","Bänke"],["der","Bauch","Bäuche"],
+["der","Baum","Bäume"],["das","Bein","Beine"],["die","Biene","Bienen"],["das","Bild","Bilder"],
+["die","Birne","Birnen"],["das","Blatt","Blätter"],["die","Blume","Blumen"],["die","Blüte","Blüten"],
+["der","Boden","Böden"],["der","Brief","Briefe"],["das","Brot","Brote"],["der","Bruder","Brüder"],
+["der","Bub","Buben"],["das","Buch","Bücher"],["der","Busch","Büsche"],["der","Clown","Clowns"],
+["der","Computer","Computer"],["die","Dose","Dosen"],["das","Ei","Eier"],["das","Ende","Enden"],
+["die","Ente","Enten"],["der","Esel","Esel"],["die","Eule","Eulen"],["der","Euro","Euros"],
+["die","Familie","Familien"],["die","Feder","Federn"],["das","Feld","Felder"],["das","Fenster","Fenster"],
+["der","Finger","Finger"],["der","Flügel","Flügel"],["die","Frau","Frauen"],["der","Freund","Freunde"],
+["die","Frucht","Früchte"],["der","Füller","Füller"],["der","Fuß","Füße"],["die","Gabel","Gabeln"],
+["der","Garten","Gärten"],["das","Gesicht","Gesichter"],["das","Gras","Gräser"],["das","Haar","Haare"],
+["der","Hai","Haie"],["der","Hase","Hasen"],["das","Haus","Häuser"],["die","Hecke","Hecken"],
+["das","Hemd","Hemden"],["der","Herr","Herren"],["die","Hexe","Hexen"],["die","Hose","Hosen"],
+["der","Hund","Hunde"],["der","Igel","Igel"],["das","Jahr","Jahre"],["der","Junge","Jungen"],
+["der","Käfer","Käfer"],["der","Kaiser","Kaiser"],["die","Katze","Katzen"],["das","Kind","Kinder"],
+["die","Kiste","Kisten"],["die","Klasse","Klassen"],["das","Kleid","Kleider"],["der","Kopf","Köpfe"],
+["der","Körper","Körper"],["die","Kuh","Kühe"],["das","Licht","Lichter"],["der","Löwe","Löwen"],
+["das","Mädchen","Mädchen"],["der","Mann","Männer"],["die","Maus","Mäuse"],["der","Monat","Monate"],
+["der","Mund","Münder"],["die","Mutter","Mütter"],["die","Nacht","Nächte"],["die","Nadel","Nadeln"],
+["der","Name","Namen"],["die","Nase","Nasen"],["die","Oma","Omas"],["der","Onkel","Onkel"],
+["der","Opa","Opas"],["die","Pause","Pausen"],["das","Pferd","Pferde"],["die","Pflanze","Pflanzen"],
+["der","Pinsel","Pinsel"],["die","Pizza","Pizzen"],["der","Platz","Plätze"],["die","Puppe","Puppen"],
+["das","Quadrat","Quadrate"],["die","Quelle","Quellen"],["der","Rabe","Raben"],["die","Raupe","Raupen"],
+["der","Ring","Ringe"],["der","Rock","Röcke"],["der","Rücken","Rücken"],["der","Saft","Säfte"],
+["das","Salz","Salze"],["der","Satz","Sätze"],["das","Schaf","Schafe"],["die","Schere","Scheren"],
+["die","Schule","Schulen"],["die","Schwester","Schwestern"],["der","See","Seen"],["die","Seife","Seifen"],
+["der","Sohn","Söhne"],["die","Sonne","Sonnen"],["der","Stein","Steine"],["der","Stern","Sterne"],
+["der","Stift","Stifte"],["der","Strauch","Sträucher"],["die","Stunde","Stunden"],["der","Tag","Tage"],
+["die","Tante","Tanten"],["die","Tasche","Taschen"],["der","Teddy","Teddys"],["das","Telefon","Telefone"],
+["das","Tier","Tiere"],["der","Tisch","Tische"],["die","Tochter","Töchter"],["die","Tomate","Tomaten"],
+["die","Uhr","Uhren"],["die","Vase","Vasen"],["der","Vater","Väter"],["der","Vogel","Vögel"],
+["der","Weg","Wege"],["die","Wiese","Wiesen"],["der","Wind","Winde"],["der","Winter","Winter"],
+["die","Woche","Wochen"],["der","Wolf","Wölfe"],["die","Wolke","Wolken"],["das","Wort","Wörter"],
+["die","Wurzel","Wurzeln"],["die","Zahl","Zahlen"],["der","Zahn","Zähne"],["die","Ziege","Ziegen"],
+["das","Zimmer","Zimmer"],["die","Zwiebel","Zwiebeln"]
+];
+const VERBS = [
+["gehen","er geht"],["arbeiten","sie arbeitet"],["backen","er bäckt"],["baden","sie badet"],
+["bauen","sie baut"],["bewegen","er bewegt"],["bitten","er bittet"],["bleiben","es bleibt"],
+["blühen","es blüht"],["brauchen","sie braucht"],["bringen","er bringt"],["danken","sie dankt"],
+["denken","er denkt"],["essen","sie isst"],["fahren","er fährt"],["fallen","sie fällt"],
+["finden","sie findet"],["fliegen","er fliegt"],["fragen","sie fragt"],["geben","sie gibt"],
+["haben","sie hat"],["heißen","er heißt"],["helfen","sie hilft"],["holen","er holt"],
+["hören","sie hört"],["kaufen","er kauft"],["kommen","sie kommt"],["laufen","er läuft"],
+["leben","sie lebt"],["legen","er legt"],["lernen","er lernt"],["lesen","sie liest"],
+["lieben","er liebt"],["liegen","es liegt"],["machen","sie macht"],["malen","er malt"],
+["nehmen","er nimmt"],["pflegen","sie pflegt"],["quaken","er quakt"],["rechnen","er rechnet"],
+["reden","sie redet"],["reisen","sie reist"],["rollen","er rollt"],["rufen","er ruft"],
+["sagen","sie sagt"],["schauen","er schaut"],["scheinen","sie scheint"],["schlafen","sie schläft"],
+["schlagen","er schlägt"],["schneiden","er schneidet"],["schreiben","sie schreibt"],["schreien","er schreit"],
+["sehen","sie sieht"],["singen","sie singt"],["sitzen","er sitzt"],["sparen","er spart"],
+["spielen","sie spielt"],["sprechen","er spricht"],["stehen","es steht"],["stellen","sie stellt"],
+["suchen","er sucht"],["tragen","sie trägt"],["trinken","er trinkt"],["turnen","sie turnt"],
+["üben","er übt"],["warten","sie wartet"],["waschen","er wäscht"],["wohnen","sie wohnt"],
+["wünschen","er wünscht"],["zahlen","sie zahlt"],["zählen","er zählt"],["zeigen","er zeigt"]
+];
+
+/* ============ FRAGEN-GENERATOREN ============ */
+const R = a => a[Math.floor(Math.random()*a.length)];
+function mischen(richtig, falsche){
+  const opts = [richtig, ...falsche.filter(f=>f && f!==richtig).slice(0,2)];
+  for(let i=opts.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [opts[i],opts[j]]=[opts[j],opts[i]]; }
+  return [opts, opts.indexOf(richtig)];
+}
+function umlaut(w){ return w.replace(/a(?!u)/,'ä').replace(/^([^äöü]*)o/,'$1ö').replace(/^([^äöüö]*)u(?!m)/,'$1ü'); }
+
+const GEN = {
+  artikel(){
+    const [art,sg] = R(WORDS);
+    const [opts,ci] = mischen(art, ['der','die','das'].filter(a=>a!==art));
+    return [`Welcher Artikel gehört zu „${sg}"?`, opts, ci,
+      `${art} ${sg}. Der Artikel begleitet das Nomen – daran erkennst du, dass ${sg} großgeschrieben wird.`];
+  },
+  mehrzahl(){
+    const [art,sg,pl] = R(WORDS);
+    const [opts,ci] = mischen(pl, [sg+'en', sg+'e', sg+'er', sg+'s', umlaut(sg)+'e']);
+    return [`Wie heißt die Mehrzahl von „${art} ${sg}"?`, opts, ci,
+      `${art} ${sg} – die ${pl}. In der Mehrzahl heißt der Artikel immer die.`];
+  },
+  einzahl(){
+    const [art,sg,pl] = R(WORDS);
+    const [opts,ci] = mischen(art+' '+sg, ['die '+sg, 'das '+sg, 'der '+sg].filter(x=>x!==art+' '+sg));
+    return [`Wie heißt die Einzahl von „die ${pl}"?`, opts, ci,
+      `${art} ${sg} – die ${pl}. Im Wörterbuch findest du Nomen immer in der Einzahl.`];
+  },
+  verbform(){
+    const [gf,pf] = R(VERBS);
+    const pron = pf.split(' ')[0], stamm = gf.replace(/e?n$/,'');
+    const [opts,ci] = mischen(pf, [pron+' '+gf, pron+' '+stamm+'st', pron+' '+stamm+'en']);
+    return [`Wie heißt die Personalform? Grundform: „${gf}"`, opts, ci,
+      `${pf}. Bei er/sie/es endet das Verb fast immer auf -t. Die Grundform endet auf -en.`];
+  },
+  grundform(){
+    const [gf,pf] = R(VERBS);
+    const stamm = gf.replace(/e?n$/,'');
+    const [opts,ci] = mischen(gf, [pf.split(' ')[1], stamm+'st', stamm+'t']);
+    return [`Wie heißt die Grundform von „${pf}"?`, opts, ci,
+      `Die Grundform ist ${gf}. Verben stehen im Wörterbuch immer in der Grundform, sie endet meist auf -en.`];
+  },
+  abc(){
+    let a = R(WORDS)[1], b = R(WORDS)[1];
+    while(b === a) b = R(WORDS)[1];
+    const erst = a.localeCompare(b,'de') < 0 ? a : b;
+    const [opts,ci] = mischen(erst, [a===erst?b:a]);
+    return [`Welches Wort steht im Wörterbuch weiter vorne?`, opts, ci,
+      `${erst} steht vorne. Vergleiche Buchstabe für Buchstabe: erst den ersten, bei gleichem Anfang den zweiten.`];
+  },
+  liste1(){ return GEN._liste(w => w[1][0] <= 'L'); },
+  liste2(){ return GEN._liste(w => w[1][0] > 'L'); },
+  _liste(filter){
+    const pool = WORDS.filter(filter);
+    const [art,sg,pl] = R(pool);
+    if(Math.random() < .5){
+      const [opts,ci] = mischen(art, ['der','die','das'].filter(a=>a!==art));
+      return [`So steht es in der Wörterliste: ___ ${sg}`, opts, ci, `${art} ${sg}, die ${pl}.`];
+    }
+    const [opts,ci] = mischen(pl, [sg+'en', sg+'e', sg+'er', umlaut(sg)+'e']);
+    return [`In der Wörterliste steht: ${art} ${sg}, die …?`, opts, ci, `${art} ${sg}, die ${pl}.`];
+  },
+  meister(){
+    const a = R(ARENAS.filter(x => x.id !== 'meister'));
+    return a.gen ? GEN[a.gen]() : R(a.qs);
+  }
+};
+
+/* ============ 30 ARENEN ============ */
+const ARENAS = [
+{id:'abc',fam:'abc',title:'ABC-Arena',sub:'Alphabet & Wörterbuch',badge:'🔤',regel:['Im ABC werden die 26 Buchstaben unserer Sprache geordnet.','Im Wörterbuch stehen alle Wörter nach dem ABC.','Sind die ersten Buchstaben gleich, entscheidet der zweite, dann der dritte.'],gen:'abc',
+ hilfe:'Sage das ABC leise auf und vergleiche die Wörter Buchstabe für Buchstabe. Sind die ersten gleich, entscheidet der zweite.'},
+
+{id:'laute',fam:'laute',title:'Laute-Arena',sub:'Vokale, Konsonanten, Umlaute, Zwielaute',badge:'🔊',regel:['Vokale sind a, e, i, o und u. Sie klingen beim Sprechen selbst.','Umlaute sind ä, ö und ü. Sie kommen von a, o und u.','Zwielaute sind au, äu, eu, ei und ai. Aus zwei Lauten wird ein neuer Laut.','Alle anderen Buchstaben sind Konsonanten, also Mitlaute.'],
+ hilfe:'Vokale klingen beim Sprechen selbst: a e i o u. Umlaute sind ä ö ü. Zwielaute entstehen aus zwei Lauten: au äu eu ei ai.',
+ qs:[
+  ['Welche Buchstaben sind die Vokale?',['a e i o u','b d f g k','ä ö ü'],0,'Vokale sind Laute, die beim Sprechen selbst klingen: a e i o u.'],
+  ['Was ist ein Umlaut?',['ä, ö oder ü','au oder ei','ein Konsonant'],0,'Aus den Vokalen a, o, u können die Umlaute ä, ö, ü werden.'],
+  ['Was ist ein Zwielaut?',['au, äu, eu, ei, ai','ein doppelter Mitlaut','ein langes h'],0,'Aus zwei Lauten wird ein neuer Laut: au, äu, eu, ei, ai.'],
+  ['Welches Wort enthält einen Zwielaut?',['Haus','Hose','Hemd'],0,'Haus – au ist ein Zwielaut.'],
+  ['Wie viele Buchstaben hat unser ABC?',['26','20','30'],0,'Im ABC werden die 26 Buchstaben unserer Sprache geordnet.'],
+  ['Was sind Konsonanten?',['Mitlaute wie b, d, f, g','die Vokale','die Umlaute'],0,'Beim Sprechen klingt ein anderer Laut mit – zum Beispiel KA oder EM.'],
+  ['Was hörst du und was siehst du?',['Laute hörst du, Buchstaben siehst du','Buchstaben hörst du, Laute siehst du'],0,'Laute nennt man die Buchstaben, wenn sie ausgesprochen werden.'],
+  ['Welcher Vokal steckt in „Ball"?',['a','o','u'],0,'Ball – der Vokal a, kurz gesprochen.']
+]},
+
+{id:'silb',fam:'silb',title:'Silben-Arena',sub:'Silben schwingen und trennen',badge:'🥁',regel:['Jede Silbe hat genau einen Vokal, Umlaut oder Zwielaut.','Sprich langsam und klatsche zu jeder Silbe einmal.','Beispiel: Ge-mü-se hat drei Silben, Kro-ko-dil auch.'],
+ hilfe:'Sprich das Wort ganz langsam und klatsche zu jeder Silbe einmal. Jede Silbe hat genau einen Vokal, Umlaut oder Zwielaut.',
+ qs:[
+  ['Wie viele Silben hat GEMÜSE?',['2','3','4'],1,'Ge-mü-se. Jede Silbe hat einen Vokal.'],
+  ['Wie trennt man BLUME?',['Blu-me','Bl-ume','Blum-e'],0,'Blu-me.'],
+  ['Was hat jede Silbe?',['einen Vokal, Umlaut oder Zwielaut','ein h','zwei Mitlaute'],0,'Ohne Vokal keine Silbe.'],
+  ['Wie viele Silben hat SCHOKOLADE?',['3','4','5'],1,'Scho-ko-la-de.'],
+  ['Wie viele Silben hat KROKODIL?',['2','3','4'],1,'Kro-ko-dil.'],
+  ['Wie trennt man KISTE?',['Ki-ste','Kis-te','Kist-e'],1,'Kis-te.'],
+  ['Wie viele Silben hat EURO?',['1','2','3'],1,'Eu-ro. Der Zwielaut eu zählt als ein Vokal.'],
+  ['Wie viele Silben hat KIND?',['1','2'],0,'Kind – nur eine Silbe.']
+]},
+
+{id:'vokal',fam:'vokal',title:'Vokal-Arena',sub:'lange und kurze Vokale',badge:'📏',regel:['Steht der Vokal am Ende der ersten Silbe, klingt er lang: Blu-me, Au-to.','Steht er in der Mitte der ersten Silbe, klingt er kurz: Wol-ke, Kis-te.','Nach einem kurzen Vokal stehen immer zwei Mitlaute.'],
+ hilfe:'Steht der Vokal am Ende der ersten Silbe, klingt er lang (Blu-me). Steht er in der Mitte, klingt er kurz (Wol-ke).',
+ qs:[
+  ['Der Vokal steht am Ende der ersten Silbe (Au-to). Wie klingt er?',['lang','kurz'],0,'Am Silbenende klingt der Vokal lang.'],
+  ['Wie klingt das o in WOL-KE?',['lang','kurz'],1,'In der Mitte der ersten Silbe klingt er kurz.'],
+  ['Wie klingt das a in GAR-TEN?',['lang','kurz'],1,'Kurz – danach folgen zwei Mitlaute.'],
+  ['Wie klingt das ü in ÜBER?',['lang','kurz'],0,'Ü-ber – der Vokal steht am Silbenende, also lang.'],
+  ['Nach einem kurzen Vokal stehen …',['zwei Mitlaute','ein Mitlaut','gar kein Mitlaut'],0,'Zum Beispiel Sonne, Katze, Bank.'],
+  ['Wie klingt das i in KIS-TE?',['lang','kurz'],1,'Kurz.'],
+  ['Wie schreibt man das schwache a am Wortende von BRU-DER?',['-a','-er'],1,'Bruder, Feder, jeder – geschrieben wird -er.'],
+  ['Welches Wort hat einen langen Vokal?',['Blume','Bank','Rock'],0,'Blu-me – das u steht am Silbenende.']
+]},
+
+{id:'nomen',fam:'nomen',title:'Nomen-Arena',sub:'Nomen erkennen und großschreiben',badge:'🏛️',regel:['Nomen sind Namen von Menschen, Tieren, Dingen und Pflanzen.','Nomen schreibt man immer groß.','Probe: Passt der, die oder das davor? Dann ist es ein Nomen.'],
+ hilfe:'Setze der, die oder das davor. Passt ein Artikel? Dann ist es ein Nomen – und Nomen schreibt man immer groß.',
+ qs:[
+  ['Was bezeichnen Nomen?',['Menschen, Tiere, Dinge und Pflanzen','nur Tätigkeiten','nur Eigenschaften'],0,'Ihre Namen heißen Nomen.'],
+  ['Wie schreibt man Nomen?',['groß','klein'],0,'Nomen schreibt man mit großem Anfangsbuchstaben.'],
+  ['Welches Wort ist ein Nomen?',['Tisch','laufen','schnell'],0,'der Tisch – ein Artikel passt davor.'],
+  ['Wie prüfst du, ob ein Wort ein Nomen ist?',['Artikel davorsetzen','Wort verlängern'],0,'Passt der, die oder das? Dann ist es ein Nomen.'],
+  ['Schreibt man WIESEL groß oder klein?',['groß','klein'],0,'Das Wiesel ist ein Tier, also ein Nomen.'],
+  ['Welcher Satz stimmt?',['Der hund bellt.','Der Hund bellt.'],1,'Hund ist ein Nomen.'],
+  ['Sind Namen wie Lisa und Peter auch groß?',['ja','nein'],0,'Alle Namen und Nomen schreibt man groß.'],
+  ['Welches Wort ist KEIN Nomen?',['Blume','Auto','grün'],2,'grün ist ein Adjektiv.']
+]},
+
+{id:'artikel',fam:'artikel',title:'Artikel-Arena',sub:'der, die, das',badge:'🔑',regel:['Artikel begleiten Nomen: der, die, das oder ein, eine.','An ihnen erkennst du, dass ein Wort ein Nomen ist.','In der Mehrzahl heißt der Artikel immer die.'],gen:'artikel',
+ hilfe:'Artikel begleiten Nomen. Sprich das Wort mit der, die und das durch – meist hörst du sofort, was passt.'},
+
+{id:'mehrzahl',fam:'mehrzahl',title:'Mehrzahl-Arena',sub:'von der Einzahl zur Mehrzahl',badge:'👥',regel:['Von Nomen kannst du die Mehrzahl bilden: der Tisch – die Tische.','In der Mehrzahl heißt der Artikel immer die.','Viele Nomen bekommen einen Umlaut: der Ball – die Bälle.'],gen:'mehrzahl',
+ hilfe:'In der Mehrzahl heißt der Artikel immer die. Viele Nomen bekommen dabei einen Umlaut: der Ball – die Bälle.'},
+
+{id:'einzahl',fam:'einzahl',title:'Einzahl-Arena',sub:'von der Mehrzahl zur Einzahl',badge:'☝️',regel:['Nomen können in der Einzahl und in der Mehrzahl stehen.','Im Wörterbuch steht immer die Einzahl mit ihrem Artikel.','Beispiel: die Bänke – in der Einzahl die Bank.'],gen:'einzahl',
+ hilfe:'Im Wörterbuch stehen Nomen in der Einzahl. Frage dich: Wie heißt ein einzelnes Stück davon?'},
+
+{id:'zusammen',fam:'zusammen',title:'Wortbau-Arena',sub:'zusammengesetzte Nomen',badge:'🧩',regel:['Nomen kann man zusammensetzen: Fuß und Ball wird Fußball.','Zusammengesetzte Nomen beschreiben genauer.','Das letzte Wort bestimmt den Artikel: der Ball, also der Fußball.'],
+ hilfe:'Zusammengesetzte Nomen beschreiben genauer. Das letzte Wort bestimmt den Artikel: der Ball – der Fußball.',
+ qs:[
+  ['Fuß + Ball = ?',['Fußball','Ballfuß'],0,'Das zweite Wort sagt, worum es geht: ein Ball.'],
+  ['Regen + Schirm = ?',['Regenschirm','Schirmregen'],0,'Ein Schirm gegen den Regen.'],
+  ['Wurst + Brot = ?',['Wurstbrot','Brotwurst'],0,'Ein Brot mit Wurst.'],
+  ['Welchen Artikel hat „Blumentopf"?',['der','die','das'],0,'Der Topf – das letzte Wort bestimmt den Artikel.'],
+  ['Welchen Artikel hat „Hausaufgabe"?',['die','der','das'],0,'Die Aufgabe – also die Hausaufgabe.'],
+  ['Aus welchen Wörtern besteht „Schulhof"?',['Schule + Hof','Schul + Ofen'],0,'Zusammengesetzte Nomen beschreiben genauer.'],
+  ['Wie schreibt man zusammengesetzte Nomen?',['groß und in einem Wort','getrennt und klein'],0,'Es bleibt ein Nomen, also groß und zusammen.'],
+  ['Zahn + Bürste = ?',['Zahnbürste','Bürstenzahn'],0,'Eine Bürste für die Zähne.']
+]},
+
+{id:'verb',fam:'verb',title:'Verben-Arena',sub:'Grundform finden',badge:'🏃',regel:['Verben sagen, was jemand tut oder was geschieht.','Die Grundform endet meist auf -en: gehen, spielen, lesen.','So stehen Verben auch im Wörterbuch.'],gen:'grundform',
+ hilfe:'Verben sagen, was jemand tut. Die Grundform endet fast immer auf -en und steht so im Wörterbuch.'},
+
+{id:'person',fam:'person',title:'Personalform-Arena',sub:'ich gehe – du gehst – er geht',badge:'👤',regel:['Verben verändern ihre Form: ich gehe, du gehst, er geht.','Bei ich endet es auf -e, bei du auf -st, bei er, sie und es auf -t.','Bei wir und sie endet es auf -en wie die Grundform.'],gen:'verbform',
+ hilfe:'Bei ich endet das Verb auf -e, bei du auf -st, bei er/sie/es auf -t. Bei wir, sie und der Grundform auf -en.'},
+
+{id:'adjektiv',fam:'adjektiv',title:'Adjektiv-Arena',sub:'wie jemand oder etwas ist',badge:'🎨',regel:['Adjektive sagen, wie jemand oder etwas ist.','Beispiele: der hohe Baum, die kleine Katze, das große Haus.','Adjektive schreibt man klein, und man kann sie steigern.'],
+ hilfe:'Adjektive antworten auf die Frage „Wie ist es?". Du kannst sie steigern: groß – größer – am größten.',
+ qs:[
+  ['Was sagen Adjektive?',['wie jemand oder etwas ist','was jemand tut','wer etwas tut'],0,'Adjektive beschreiben.'],
+  ['Welches Wort ist ein Adjektiv?',['blau','Blume','blühen'],0,'blau beschreibt, wie etwas ist.'],
+  ['der ___ Baum (sehr hoch)',['hohe','Hohe','hohen'],0,'der hohe Baum – Adjektive schreibt man klein.'],
+  ['Schreibt man Adjektive groß oder klein?',['klein','groß'],0,'Nur Nomen und Satzanfänge werden großgeschrieben.'],
+  ['Wie heißt die Steigerung von „groß"?',['größer','großer','mehr groß'],0,'groß – größer – am größten.'],
+  ['Welches Wort ist KEIN Adjektiv?',['Katze','klein','schnell'],0,'Katze ist ein Nomen.'],
+  ['die ___ Katze (nicht groß)',['kleine','Kleine'],0,'die kleine Katze.'],
+  ['Wie heißt die Steigerung von „arm"?',['ärmer','armer'],0,'arm – ärmer – am ärmsten.']
+]},
+
+{id:'satz',fam:'satz',title:'Satz-Arena',sub:'Aussagesatz, Fragesatz, Ausruf',badge:'❗',regel:['Ein Satz besteht aus Wörtern, die zusammen Sinn ergeben.','Der Aussagesatz erzählt etwas und endet mit einem Punkt.','Der Fragesatz fragt etwas und endet mit einem Fragezeichen.','Der Ausruf zeigt Gefühle oder warnt und endet mit einem Ausrufezeichen.'],
+ hilfe:'Lies den Satz laut vor. Erzählt er etwas? Punkt. Fragt er etwas? Fragezeichen. Ruft oder warnt jemand? Ausrufezeichen.',
+ qs:[
+  ['Am Ende eines Aussagesatzes steht …',['ein Punkt','ein Fragezeichen'],0,'Der Aussagesatz erzählt etwas.'],
+  ['„Wo wohnst du?" ist ein …',['Fragesatz mit Fragewort','Fragesatz ohne Fragewort'],0,'Wo ist das Fragewort.'],
+  ['„Kommst du mit?" ist ein …',['Fragesatz ohne Fragewort','Aussagesatz'],0,'Hier steht kein Fragewort am Anfang.'],
+  ['„Hilfe!" ist ein …',['Ausruf','Fragesatz'],0,'Der Ausruf warnt oder zeigt Gefühle.'],
+  ['Beim Vorlesen eines Fragesatzes geht die Stimme …',['nach oben','nach unten'],0,'Probiere es laut aus.'],
+  ['„Der Hund schläft." ist ein …',['Aussagesatz','Ausruf'],0,'Er erzählt etwas.'],
+  ['Was ist ein Satz?',['Wörter, die zusammen Sinn ergeben','ein einzelnes Wort'],0,'Es gibt Aussagesätze, Fragesätze und Ausrufe.'],
+  ['„Wie schön!" ist ein …',['Ausruf','Aussagesatz'],0,'Der Ausruf zeigt Gefühle.']
+]},
+
+{id:'zeichen',fam:'zeichen',title:'Satzzeichen-Arena',sub:'Punkt, Fragezeichen, Ausrufezeichen',badge:'⁉️',regel:['Punkt, Fragezeichen und Ausrufezeichen nennt man Satzzeichen.','Sie stehen immer am Ende eines Satzes.','Frage dich: Erzählt der Satz etwas, fragt er oder ruft er?'],
+ hilfe:'Die drei Satzzeichen stehen immer am Ende eines Satzes. Frage dich: Erzählt, fragt oder ruft der Satz?',
+ qs:[
+  ['Welche Satzzeichen gibt es?',['. ? !','. , ;'],0,'Punkt, Fragezeichen und Ausrufezeichen.'],
+  ['Wo stehen Satzzeichen?',['am Ende eines Satzes','am Anfang'],0,'Sie schließen den Satz ab.'],
+  ['„Hast du Hunger" – welches Zeichen fehlt?',['?','!'],0,'Ein Fragesatz ohne Fragewort.'],
+  ['„Pass auf" – welches Zeichen fehlt?',['!','.'],0,'Eine Warnung, also ein Ausruf.'],
+  ['„Mia fährt Roller" – welches Zeichen fehlt?',['.','?'],0,'Ein Aussagesatz.'],
+  ['„Wann beginnt die Schule" – welches Zeichen?',['?','!'],0,'Fragesatz mit Fragewort wann.'],
+  ['„Toll" – welches Zeichen?',['!','.'],0,'Ein Ausruf zeigt Gefühle.'],
+  ['„Heute scheint die Sonne" – welches Zeichen?',['.','!'],0,'Ein Aussagesatz.']
+]},
+
+{id:'grossa',fam:'grossa',title:'Satzanfang-Arena',sub:'Großschreibung am Satzanfang',badge:'🅰️',regel:['Das erste Wort im Satz schreibt man groß.','Alle Namen und alle Nomen schreibt man groß.','Verben und Adjektive bleiben mitten im Satz klein.'],
+ hilfe:'Drei Dinge schreibt man groß: das erste Wort im Satz, alle Namen und alle Nomen.',
+ qs:[
+  ['Wie schreibt man das erste Wort eines Satzes?',['groß','klein'],0,'Immer groß.'],
+  ['Welcher Satz stimmt?',['heute regnet es.','Heute regnet es.'],1,'Satzanfang groß.'],
+  ['Welche Wörter schreibt man groß?',['Satzanfang, Namen und Nomen','alle Wörter','nur Namen'],0,'Diese drei.'],
+  ['Welcher Satz stimmt?',['Mimi isst gerne Eis.','mimi isst gerne eis.'],0,'Mimi ist ein Name, Eis ein Nomen.'],
+  ['Wird „und" mitten im Satz großgeschrieben?',['nein','ja'],0,'Nur am Satzanfang.'],
+  ['Welcher Satz stimmt?',['Der Vogel singt laut.','Der vogel singt Laut.'],0,'Vogel ist das Nomen, laut ein Adjektiv.'],
+  ['Wie schreibt man „die schule beginnt"?',['Die Schule beginnt','die Schule beginnt'],0,'Satzanfang und Nomen groß.'],
+  ['Schreibt man Verben mitten im Satz groß?',['nein','ja'],0,'Verben und Adjektive bleiben klein.']
+]},
+
+{id:'stamm',fam:'stamm',title:'Wortstamm-Arena',sub:'verwandte Wörter erkennen',badge:'🌳',regel:['Der Wortstamm ist der Teil, der bei verwandten Wörtern gleich bleibt.','Beispiel: fangen und fängt, Freund und Freundin.','Verwandte Wörter helfen dir beim richtigen Schreiben.'],
+ hilfe:'Der Wortstamm ist der Teil, der gleich oder ähnlich geschrieben wird. Suche ihn in allen Wörtern der Familie.',
+ qs:[
+  ['Was ist der Wortstamm?',['der gleiche Teil verwandter Wörter','das kürzeste Wort'],0,'fangen – fängt, Freund – Freundin.'],
+  ['Welches Wort gehört zur Familie von „Freund"?',['Freundschaft','Freude'],0,'Freund, Freundin, freundlich, anfreunden.'],
+  ['Welches Wort gehört NICHT zu „fahren"?',['Fahrrad','Fabrik','Fahrer'],1,'fahr ist der Wortstamm.'],
+  ['Der Wortstamm von „Schreibtisch" und „schreiben" ist …',['schreib','tisch'],0,'schreib – dazu gehören auch Schreibheft und aufschreiben.'],
+  ['Welche gehören zusammen?',['Wasser – wässrig – Wasserfall','Wasser – Watte'],0,'Gleicher Wortstamm.'],
+  ['Warum hilft der Wortstamm beim Schreiben?',['weil verwandte Wörter ähnlich geschrieben werden','weil er kürzer ist'],0,'Deshalb prüft man mit verwandten Wörtern.'],
+  ['Welches Wort gehört zu „Jahr"?',['jährlich','jagen'],0,'Jahreszeit, Schuljahr, jährlich.'],
+  ['Welches Wort gehört zu „süß"?',['Süßigkeit','Suppe'],0,'süßlich, zuckersüß, Süßigkeit.']
+]},
+
+{id:'baustein',fam:'baustein',title:'Bausteine-Arena',sub:'vor-, ver-, -heit, -keit, -ung, -ig',badge:'🧱',regel:['Wortbausteine hängst du vorne oder hinten an den Wortstamm.','Vorne: vor-lesen und ver-zaubern, immer mit v geschrieben.','Hinten: Spiel-zeug, Frei-heit, Tapfer-keit, Zeit-ung und durst-ig.'],
+ hilfe:'Wortbausteine hängst du vorne oder hinten an den Wortstamm. Sie werden immer gleich geschrieben – das kannst du dir merken.',
+ qs:[
+  ['Wie schreibt man diesen Baustein?',['vorlesen','forlesen'],0,'vor- immer mit v: Vormittag, vorsichtig.'],
+  ['Wie schreibt man diesen Baustein?',['verzaubern','ferzaubern'],0,'ver- immer mit v: Verbot, vergesslich.'],
+  ['Adjektive auf -ig enden mit …',['g','ch'],0,'durstig, heftig, neugierig.'],
+  ['Freiheit und Sicherheit enden auf …',['-heit','-hait'],0,'Ein Wortbaustein bei Nomen.'],
+  ['Tapferkeit und Einsamkeit enden auf …',['-keit','-keid'],0,'Auch -keit ist ein Baustein.'],
+  ['Zeitung und Heizung enden auf …',['-ung','-ug'],0,'Diese Endungen verlängert man nicht mehr.'],
+  ['Wo steht der Baustein bei „Spielzeug"?',['hinten','vorne'],0,'Spiel-zeug: hinten an den Wortstamm.'],
+  ['Wie schreibt man „vorsichtig"?',['vorsichtig','forsichtich'],0,'vor- mit v und -ig mit g.']
+]},
+
+{id:'trenn',fam:'trenn',title:'Trenn-Arena',sub:'ck bleibt zusammen, tz wird getrennt',badge:'✂️',regel:['ck bleibt beim Trennen immer zusammen: Zu-cker, ba-cken.','tz wird beim Trennen immer getrennt: Kat-ze, Müt-ze.','Merke: ck ist der Deckel auf der Truhe, tz sind zwei Puzzleteile.'],
+ hilfe:'ck bleibt zusammen wie der Deckel auf der Schatztruhe. tz sind zwei Puzzleteile – die werden getrennt.',
+ qs:[
+  ['Wie trennt man ZUCKER?',['Zuc-ker','Zu-cker'],1,'ck bleibt zusammen.'],
+  ['Wie trennt man KATZE?',['Ka-tze','Kat-ze'],1,'tz wird getrennt.'],
+  ['Darf man ck trennen?',['ja','nein'],1,'Niemals.'],
+  ['Wie trennt man MÜTZE?',['Mü-tze','Müt-ze'],1,'Müt-ze.'],
+  ['Wie trennt man BACKEN?',['Bak-ken','Ba-cken'],1,'Ba-cken.'],
+  ['Wie trennt man SITZEN?',['si-tzen','sit-zen'],1,'sit-zen.'],
+  ['Wie trennt man DECKE?',['Dec-ke','De-cke'],1,'De-cke.'],
+  ['Wie trennt man PFÜTZE?',['Pfü-tze','Pfüt-ze'],1,'Pfüt-ze.']
+]},
+
+{id:'zeile',fam:'zeile',title:'Zeilenende-Arena',sub:'Wörter am Zeilenende trennen',badge:'📐',regel:['Am Zeilenende trennst du nach Sprechsilben.','Ein einzelner Vokal darf nicht alleine stehen: Amei-se, nicht A-meise.','Sprich das Wort langsam, dann hörst du die Silben.'],
+ hilfe:'Trenne nach Sprechsilben. Ein einzelner Vokal darf nicht alleine am Zeilenende stehen.',
+ qs:[
+  ['Wie trennt man AMEISE?',['A-meise','Amei-se'],1,'Ein einzelner Vokal bleibt nicht allein.'],
+  ['Wie trennt man ELEFANT?',['E-lefant','Ele-fant'],1,'Ele-fant.'],
+  ['Wie trennt man GARTEN?',['Ga-rten','Gar-ten'],1,'Gar-ten.'],
+  ['Wie trennt man ARBEITEN?',['ar-bei-ten','a-rbeiten'],0,'Nach Sprechsilben trennen.'],
+  ['Wonach trennst du Wörter?',['nach Sprechsilben','nach Buchstabenzahl'],0,'Sprich das Wort langsam.'],
+  ['Wie trennt man MORGEN?',['mor-gen','mo-rgen'],0,'Das r gehört zur ersten Silbe.'],
+  ['Wie trennt man ZUSAMMEN?',['zu-sam-men','zus-am-men'],0,'Drei Sprechsilben.'],
+  ['Wie trennt man SCHULE?',['Schu-le','Sch-ule'],0,'sch bleibt zusammen.']
+]},
+
+{id:'dehn',fam:'dehn',title:'Dehnungs-Arena',sub:'das Dehnungs-h',badge:'💧',regel:['Das Dehnungs-h steht oft nach einem langen Vokal.','Danach hörst du häufig L, M, N oder R: Zahn, Ohr, Uhr, zehn.','Nach qu, t und sch steht meistens kein Dehnungs-h: quälen, Tal, Schule.'],
+ hilfe:'Sprich langsam. Klingt der Vokal lang und folgt danach L, M, N oder R? Dann steht meist ein Dehnungs-h. Nach qu, t und sch fast nie.',
+ qs:[
+  ['Nach dem Dehnungs-h hörst du häufig …',['L, M, N oder R','B, D, G'],0,'Zahn, Ohr, Uhr, sehen, zehn.'],
+  ['Wie schreibt man es richtig?',['Zan','Zahn'],1,'Zahn.'],
+  ['Hat SCHULE ein Dehnungs-h?',['ja','nein'],1,'Nach sch steht keines.'],
+  ['Welches Wort hat KEIN Dehnungs-h?',['Uhr','quälen'],1,'Nach qu, t, sch fast nie.'],
+  ['Welches Merkwort hat trotzdem ein Dehnungs-h?',['sprechen','strahlen'],1,'stehen, stöhnen, strahlen, Stuhl.'],
+  ['Wie schreibt man die kleinen Wörter?',['im, ir','ihm, ihr'],1,'ihm, ihr, sehr, zählen.'],
+  ['Wie schreibt man es richtig?',['zehn','zen'],0,'zehn – h vor dem n.'],
+  ['Wie schreibt man es richtig?',['Ohr','Or'],0,'Ohr – h vor dem r.']
+]},
+
+{id:'ie',fam:'ie',title:'ie-Arena',sub:'langes i schreibt man ie',badge:'🔵',regel:['Ein lang gesprochenes i schreibt man meistens ie: Tier, Brief, tief.','Klingt das i kurz, schreibst du nur i: Insel, Tinte, Pinsel.','Sprich das Wort leise vor und höre genau hin.'],
+ hilfe:'Sprich das Wort leise vor. Klingt das i lang, schreibst du meistens ie. Klingt es kurz, schreibst du nur i.',
+ qs:[
+  ['Wie schreibt man es richtig?',['Tir','Tier'],1,'Langes i wird ie.'],
+  ['Wie schreibt man es richtig?',['Brief','Brif'],0,'Brief.'],
+  ['Ist das i in INSEL lang oder kurz?',['lang','kurz'],1,'Insel, Tinte, Pinsel, Flinte.'],
+  ['Wie schreibt man es richtig?',['tief','tif'],0,'tief.'],
+  ['Wie schreibt man es richtig?',['spielen','spilen'],0,'spielen.'],
+  ['Welches Wort hat ein kurzes i?',['Tinte','Wiese'],0,'Tinte – kurzes i ohne e.'],
+  ['Wie schreibt man es richtig?',['Ziege','Zige'],0,'Ziege.'],
+  ['Ein lang gesprochenes i am Silbenende wird …',['ie','ih'],0,'Tie-re, lie-ben.']
+]},
+
+{id:'dopp',fam:'dopp',title:'Doppel-Arena',sub:'doppelte Mitlaute nach kurzem Vokal',badge:'👯',regel:['Nach einem kurzen betonten Vokal verdoppelst du den Mitlaut: Sonne, Roller, Kamm.','Statt kk schreibt man ck: Rock, Schnecke.','Statt zz schreibt man tz: Katze, Mütze.'],
+ hilfe:'Höre auf den Vokal davor: Klingt er kurz und betont, verdoppelt sich der Mitlaut. Statt kk schreibst du ck, statt zz schreibst du tz.',
+ qs:[
+  ['Nach einem kurzen betonten Vokal musst du den Mitlaut …',['verdoppeln','weglassen'],0,'Sonne, Roller, Kamm.'],
+  ['Wie schreibt man es richtig?',['Sone','Sonne'],1,'Kurzes o, also nn.'],
+  ['Statt kk schreibt man …',['ck','kk'],0,'Rock, Schnecke, backen.'],
+  ['Statt zz schreibt man …',['tz','zz'],0,'Katze, Mütze, sitzen.'],
+  ['Wie schreibt man es richtig?',['Klase','Klasse'],1,'Kurzes a, also ss.'],
+  ['Wie schreibt man es richtig?',['Kam','Kamm'],1,'Kamm.'],
+  ['Wie schreibt man es richtig?',['Schneke','Schnecke'],1,'Schnecke.'],
+  ['Wie schreibt man es richtig?',['Tone','Tonne'],1,'Tonne.']
+]},
+
+{id:'lang',fam:'lang',title:'Verlängerungs-Arena',sub:'b–p, d–t, g–k hörbar machen',badge:'🔍',regel:['Manche Buchstaben klingen am Wortende gleich: b und p, d und t, g und k.','Verlängere das Wort, dann hörst du den richtigen Buchstaben.','Beispiel: ein Bild – viele Bil-der. Also schreibt man Bild mit d.'],
+ hilfe:'Verlängere das Wort und sprich es in Silben: aus einem Bild werden viele Bil-der. In der zweiten Silbe hörst du den Buchstaben deutlich.',
+ qs:[
+  ['ein Bild – viele …?',['Bilder','Bilter'],0,'Bil-der, also Bild mit d.'],
+  ['lieb – verlängert …',['lieper','lieber'],1,'lie-ber, also lieb mit b.'],
+  ['wild – verlängert …',['wilter','wilder'],1,'wil-der.'],
+  ['ein Tag – viele …?',['Take','Tage'],1,'Ta-ge.'],
+  ['eine Bank – viele …?',['Bänge','Bänke'],1,'Bän-ke.'],
+  ['sie sagt – Grundform …',['sacken','sagen'],1,'sa-gen.'],
+  ['das Kalb – viele …?',['Kälper','Kälber'],1,'Käl-ber.'],
+  ['der Zwerg – viele …?',['Zwerke','Zwerge'],1,'Zwer-ge.']
+]},
+
+{id:'aeae',fam:'aeae',title:'ä-Arena',sub:'ä kommt von a',badge:'🌿',regel:['Klingt ein ä wie ein e, suche ein verwandtes Wort mit a.','Beispiel: backen wird zu Bäcker, Kraft wird zu kräftig.','Findest du kein Wort mit a, schreibst du meistens e.'],
+ hilfe:'Suche ein verwandtes Wort mit a. Findest du eines, schreibst du ä. Findest du keines, ist es meist ein e.',
+ qs:[
+  ['Warum schreibt man BÄCKER mit ä?',['wegen backen','wegen Becher'],0,'backen → Bäcker.'],
+  ['HÄNGEN kommt von …',['Hang','Henne'],0,'der Hang.'],
+  ['KRÄFTIG kommt von …',['Kraft','Kreft'],0,'die Kraft.'],
+  ['Die Männer – Einzahl?',['der Mann','der Menn'],0,'Mann → Männer.'],
+  ['sie fängt – Grundform?',['fangen','fengen'],0,'fangen.'],
+  ['Die Bänke – Einzahl?',['die Bank','die Benke'],0,'Bank → Bänke.'],
+  ['er wäscht – Grundform?',['waschen','weschen'],0,'waschen.'],
+  ['Findest du kein verwandtes Wort mit a, schreibst du meist …',['e','ä'],0,'Herz, Berg, lernen.']
+]},
+
+{id:'aeu',fam:'aeu',title:'äu-Arena',sub:'äu kommt von au',badge:'💦',regel:['Klingt ein äu wie eu, suche ein verwandtes Wort mit au.','Beispiel: Traum wird zu träumen, laut wird zu läuten.','Findest du kein Wort mit au, schreibst du meistens eu.'],
+ hilfe:'Suche ein verwandtes Wort mit au. Findest du eines, schreibst du äu. Findest du keines, ist es meist eu.',
+ qs:[
+  ['TRÄUMEN kommt von …',['Traum','Treue'],0,'der Traum → träumen.'],
+  ['LÄUTEN kommt von …',['laut','Leute'],0,'laut → läuten.'],
+  ['Die Mäuse – Einzahl?',['die Maus','die Meuse'],0,'Maus → Mäuse.'],
+  ['er läuft – Grundform?',['laufen','leufen'],0,'laufen.'],
+  ['Die Häuser – Einzahl?',['das Haus','das Heus'],0,'Haus → Häuser.'],
+  ['er räumt – kommt von …',['Raum','Reim'],0,'der Raum → räumen.'],
+  ['sie säubert – kommt von …',['sauber','Seuche'],0,'sauber → säubern.'],
+  ['Findest du kein verwandtes Wort mit au, schreibst du meist …',['eu','äu'],0,'heute, Leute, neu.']
+]},
+
+{id:'esszet',fam:'esszet',title:'ß-Arena',sub:'ß und ss unterscheiden',badge:'🅱️',regel:['Nach einem kurzen Vokal schreibt man ss: Wasser, Klasse.','Nach einem langen Vokal oder einem Zwielaut schreibt man ß: Straße, Fuß, heißen.','Höre auf den Vokal davor, dann weißt du es.'],
+ hilfe:'Nach einem kurzen Vokal steht ss (Klasse, Wasser). Nach einem langen Vokal oder Zwielaut steht ß (Straße, heißen, Fuß).',
+ qs:[
+  ['Wie schreibt man es richtig?',['Straße','Strasse'],0,'Langer Vokal, also ß.'],
+  ['Wie schreibt man es richtig?',['Fus','Fuß'],1,'der Fuß, die Füße.'],
+  ['Wie schreibt man es richtig?',['heissen','heißen'],1,'Zwielaut ei, also ß.'],
+  ['Wie schreibt man es richtig?',['Wasser','Waßer'],0,'Kurzes a, also ss.'],
+  ['Wie schreibt man es richtig?',['groß','gross'],0,'Langes o, also ß.'],
+  ['Wie schreibt man es richtig?',['draußen','draussen'],0,'Zwielaut au, also ß.'],
+  ['Wie schreibt man es richtig?',['Klasse','Klaße'],0,'Kurzes a, also ss.'],
+  ['Wie schreibt man es richtig?',['weiß','weiss'],0,'Zwielaut ei, also ß.']
+]},
+
+{id:'merkv',fam:'merkv',title:'Merkwort-Arena',sub:'V, Y, C, X und andere Merkstellen',badge:'📖',regel:['Merkwörter kannst du nicht ableiten, du musst sie dir merken.','Mit V: Vogel, Vater, vier, voll und Vase.','Mit y, c, x oder ai: Baby, Cent, Hexe und Hai.'],
+ hilfe:'Merkwörter kannst du nicht ableiten – hier hilft nur anschauen, aufschreiben und merken. Im Zweifel im Wörterbuch nachschlagen.',
+ qs:[
+  ['Wie schreibt man das Tier?',['Fogel','Vogel'],1,'Vogel, Vater, vier, voll.'],
+  ['Wie schreibt man es richtig?',['Vase','Fase'],0,'die Vase, die Vasen.'],
+  ['Welches Wort hat ein y?',['Baby','Babi'],0,'Baby, Ypsilon, Yak.'],
+  ['Wie schreibt man es richtig?',['Cent','Zent'],0,'der Cent, der Computer, der Clown.'],
+  ['Welches Wort hat ein x?',['Hexe','Hekse'],0,'die Hexe, das Taxi, der Text.'],
+  ['Welches Wort hat ai?',['Hai','Hei'],0,'der Hai, der Mai, der Laib.'],
+  ['MÄDCHEN hat ä ohne verwandtes a. Was tust du?',['merken','verlängern'],0,'Mädchen, Bär, Käfig, Märchen.'],
+  ['Wie schreibt man es richtig?',['Quatsch','Kwatsch'],0,'qu: Quelle, Quadrat, quaken.']
+]},
+
+{id:'liste1',fam:'liste1',title:'Wörterliste A–L',sub:'Artikel und Mehrzahl aus der Liste',badge:'📗',regel:['In der Wörterliste steht bei jedem Nomen der Artikel und die Mehrzahl.','Hier kommen die Wörter von A bis L dran.','Im Zweifel darfst du im Wörterbuch nachschlagen.'],gen:'liste1',
+ hilfe:'In der Wörterliste steht bei jedem Nomen der Artikel und die Mehrzahl. Schlage im Zweifel nach – das ist keine Schummelei.'},
+
+{id:'liste2',fam:'liste2',title:'Wörterliste M–Z',sub:'Artikel und Mehrzahl aus der Liste',badge:'📘',regel:['Hier kommen die Wörter von M bis Z dran.','Achte auf den Umlaut in der Mehrzahl: der Wolf – die Wölfe.','Manche Nomen bleiben gleich: das Zimmer – die Zimmer.'],gen:'liste2',
+ hilfe:'Achte auf den Umlaut in der Mehrzahl: der Wolf – die Wölfe, die Nacht – die Nächte, das Wort – die Wörter.'},
+
+{id:'meister',fam:'meister',title:'Meister-Arena',sub:'alle Regeln gemischt',badge:'👑',regel:['In der Meister-Arena kommen alle Regeln durcheinander.','Überlege bei jeder Aufgabe zuerst: Um welche Regel geht es?','Dann wende den passenden Trick an.'],gen:'meister',
+ hilfe:'Hier kommt alles durcheinander. Überlege bei jeder Frage zuerst: Um welche Regel geht es überhaupt?'}
+];
+
+/* ============ SPIELSTAND ============ */
+const SAVE_KEY = 'wortmonster-save-v2';
+let G = null;
+
+function blankGame(){
+  return {name:'Trainer', team:[], dex:[], badges:[], arena:0, active:0,
+          stats:{richtig:0,falsch:0,kaempfe:0,rules:{},qs:{}}, gesehen:false};
+}
+function fixSave(s){
+  if(!s || typeof s !== 'object') return null;
+  s.name = s.name || 'Trainer';
+  s.team = s.team || []; s.dex = s.dex || []; s.badges = s.badges || [];
+  s.arena = s.arena || 0; s.active = s.active || 0;
+  s.stats = s.stats || {richtig:0,falsch:0,kaempfe:0};
+  s.stats.rules = s.stats.rules || {}; s.stats.qs = s.stats.qs || {};
+  migrateKeys(s.stats);
+  if(s.active >= s.team.length) s.active = 0;
+  return s;
+}
+function fortschritt(s){
+  if(!s || !s.team || !s.team.length) return -1;
+  return (s.badges||[]).length*1000 + (s.stats?s.stats.richtig:0)*10 + s.team.reduce((a,t)=>a+t.level,0);
+}
+// Firebase verbietet in Schluesseln: . # $ / [ ]  -> alles Unerlaubte ersetzen
+function safeQKey(x){ return String(x).replace(/[.#$\/\[\]]/g,'_'); }
+function textHash(t){ let h=0; for(let i=0;i<t.length;i++){ h=(h*31+t.charCodeAt(i))|0; } return Math.abs(h).toString(36); }
+// Alte Staende mit ungueltigen Schluesseln reparieren
+function migrateKeys(stats){
+  const neu={};
+  for(const k in (stats.qs||{})){
+    const v = stats.qs[k];
+    const teil = k.split(/[#~]/);
+    const nk = safeQKey(teil[0]) + '~' + safeQKey(teil.slice(1).join('~'));
+    neu[nk] = v;
+  }
+  stats.qs = neu;
+  return stats;
+}
+
+function trackAnswer(arenaId, key, right, text){
+  const r = G.stats.rules[arenaId] || (G.stats.rules[arenaId]={r:0,f:0});
+  const k = safeQKey(arenaId)+'~'+safeQKey(key);
+  const q = G.stats.qs[k] || (G.stats.qs[k]={r:0,f:0,t:text});
+  q.t = text;
+  if(right){ r.r++; q.r++; } else { r.f++; q.f++; }
+}
+function punkte(){
+  if(!G) return 0;
+  const lvl = G.team.reduce((s,t)=>s+t.level,0);
+  return Math.max(0, G.badges.length*150 + G.stats.richtig*10 + lvl*20 - G.stats.falsch*3);
+}
+
+/* Entwicklungsfortschritt: wie viel fehlt bis zur naechsten Stufe? */
+function xpBis(level){ return 60 + level*40; }
+function evoInfo(t){
+  const stage = t.level >= 10 ? 3 : (t.level >= 5 ? 2 : 1);
+  if(stage === 3) return {fertig:true, stage, pct:100, rest:0, next:null};
+  const ziel = stage === 1 ? 5 : 10, start = stage === 1 ? 1 : 5;
+  let rest = xpBis(t.level) - t.xp;
+  for(let l = t.level+1; l < ziel; l++) rest += xpBis(l);
+  let gesamt = 0;
+  for(let l = start; l < ziel; l++) gesamt += xpBis(l);
+  const f = FAMILIES[t.fam] || FAMILIES.silb;
+  return {fertig:false, stage, ziel, rest, pct: Math.max(0, Math.min(100, Math.round((1-rest/gesamt)*100))),
+          next: f.names[stage]};
+}
+
+async function saveGame(showToast){
+  const txt = JSON.stringify(G);
+  let ok = false;
+  try{ localStorage.setItem(SAVE_KEY, txt); ok = true; }catch(e){}
+  try{ await window.storage.set(SAVE_KEY, txt); ok = true; }catch(e){}
+  cloudSave();
+  if(showToast) toast(ok ? 'Spielstand gespeichert' : 'Speichern hat nicht geklappt');
+}
+async function loadSave(){
+  let a=null,b=null,c=null;
+  try{ const t = localStorage.getItem(SAVE_KEY); if(t) a = fixSave(JSON.parse(t)); }catch(e){}
+  try{ const r = await window.storage.get(SAVE_KEY); if(r&&r.value) b = fixSave(JSON.parse(r.value)); }catch(e){}
+  try{ const t = localStorage.getItem('wortmonster-save-v1'); if(t) c = fixSave(JSON.parse(t)); }catch(e){}
+  let best = fortschritt(a) >= fortschritt(b) ? a : b;
+  if(fortschritt(c) > fortschritt(best)) best = c;   // Spielstand der Vorversion
+  if(fortschritt(best) < 0) return null;
+  best.badges = best.badges.filter(id => ARENAS.some(a2 => a2.id === id));
+  best.team = best.team.filter(t => FAMILIES[t.fam]);
+  best.dex  = best.dex.filter(f => FAMILIES[f]);
+  if(!best.team.length) return null;
+  if(best.active >= best.team.length) best.active = 0;
+  best.arena = Math.max(best.arena||0, best.badges.length);
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(best)); }catch(e){}
+  return best;
+}
+
+/* ============ FIREBASE ============ */
+let DB=null, FB_OK=false, FB_MSG='', FB_READY=null;
+function withTimeout(p,ms){ return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('Zeitüberschreitung')),ms))]); }
+FB_READY = (async function initFB(){
+  if(typeof firebase === 'undefined'){ FB_MSG='Das Firebase-Modul konnte nicht geladen werden. Bist du online?'; return; }
+  for(let i=0;i<DB_URLS.length;i++){
+    try{
+      const app = firebase.initializeApp({...FIREBASE_CONFIG, databaseURL: DB_URLS[i]}, 'db'+i);
+      const db = firebase.database(app);
+      await withTimeout(db.ref('wortmonster/ping').get(), 6000);
+      DB = db; FB_OK = true; FB_MSG=''; return;
+    }catch(e){
+      FB_MSG = 'Keine Verbindung zur Datenbank ('+(e && e.message ? e.message : 'unbekannt')+
+               '). Prüfe in der Firebase-Konsole die Realtime-Database-URL und die Regeln.';
+    }
+  }
+})();
+function safeKey(n){ return (n||'Trainer').toLowerCase().replace(/[^a-z0-9äöüß]/g,'_').slice(0,20) || 'trainer'; }
+// Objektschluessel firebasetauglich machen (Punkte, #, $, /, [, ] sind verboten)
+function reinigen(obj){
+  const out={};
+  for(const k in (obj||{})){
+    let nk = String(k).replace(/[.#$\/\[\]]/g,'_').slice(0,80);
+    if(!nk) nk='_';
+    while(out[nk]) nk += '_';
+    out[nk] = obj[k];
+  }
+  return out;
+}
+
+async function syncCloud(){
+  await FB_READY;
+  if(!FB_OK || !G || !G.team.length) return {ok:false, err:FB_MSG||'nicht verbunden'};
+  try{
+    await DB.ref('wortmonster/spieler/'+safeKey(G.name)).set({
+      name:G.name, punkte:punkte(), orden:G.badges.length,
+      richtig:G.stats.richtig, falsch:G.stats.falsch,
+      team:G.team.map(t=>({fam:t.fam, level:t.level})),
+      rules:G.stats.rules, qs:reinigen(G.stats.qs), stand:Date.now()
+    });
+    return {ok:true};
+  }catch(e){ return {ok:false, err:(e&&e.message)||'Schreiben nicht erlaubt'}; }
+}
+async function fetchSpieler(){
+  await FB_READY;
+  if(!FB_OK) return null;
+  try{ const s = await DB.ref('wortmonster/spieler').get(); return s.exists()?s.val():{}; }catch(e){ return null; }
+}
+async function cloudSave(){
+  await FB_READY;
+  if(!FB_OK || !G || !G.team.length) return;
+  try{ await DB.ref('wortmonster/spielstaende/'+safeKey(G.name)).set({stand:Date.now(), daten:JSON.stringify(G)}); }catch(e){}
+}
+async function cloudSaveList(){
+  await FB_READY;
+  if(!FB_OK) return null;
+  try{ const s = await DB.ref('wortmonster/spielstaende').get(); return s.exists()?s.val():{}; }catch(e){ return null; }
+}
+
+/* ============ BESTENLISTE ============ */
+async function openBoard(){
+  show('s-board');
+  const nameEl = document.getElementById('boardName');
+  nameEl.value = G ? G.name : '';
+  nameEl.disabled = !G;
+  document.getElementById('boardPunkte').textContent = G ? punkte()+' Punkte' : 'Starte zuerst ein Spiel';
+  document.getElementById('btnEintragen').disabled = !G;
+  document.getElementById('boardMsg').textContent = '';
+  ladeBoard();
+}
+async function eintragen(){
+  const msg = document.getElementById('boardMsg');
+  if(!G){ msg.className='msg err'; msg.textContent='Du musst zuerst ein Spiel starten.'; return; }
+  const n = document.getElementById('boardName').value.trim();
+  if(n) G.name = n.slice(0,14);
+  msg.className='msg'; msg.textContent='Wird eingetragen …';
+  migrateKeys(G.stats);
+  await saveGame();
+  const res = await syncCloud();
+  if(res.ok){
+    msg.className='msg ok';
+    msg.textContent = 'Eingetragen! ' + G.name + ' steht jetzt mit ' + punkte() + ' Punkten in der Liste.';
+    renderMap(); ladeBoard();
+  } else {
+    msg.className='msg err';
+    msg.textContent = 'Das hat nicht geklappt: ' + res.err;
+  }
+}
+async function ladeBoard(){
+  const info = document.getElementById('boardInfo');
+  const list = document.getElementById('boardList');
+  info.textContent='Wird geladen …'; list.innerHTML='';
+  const all = await fetchSpieler();
+  if(!all){ info.textContent = FB_MSG || 'Die Bestenliste ist gerade nicht erreichbar.'; return; }
+  const rows = Object.values(all).filter(r=>r&&r.name).sort((a,b)=>(b.punkte||0)-(a.punkte||0)).slice(0,20);
+  info.textContent = rows.length ? 'Punkte gibt es für Orden, richtige Antworten und starke Monster.'
+                                 : 'Noch niemand eingetragen. Sei der Erste!';
+  const medal=['🥇','🥈','🥉'];
+  list.innerHTML = rows.map((r,i)=>`<div class="bl ${G&&r.name===G.name?'me':''}">
+      <div class="rk">${medal[i]||(i+1)}</div>
+      <div class="nm">${r.name}<small>${r.orden||0} Orden · ${r.richtig||0} richtig</small></div>
+      <div class="pt">${r.punkte||0}</div></div>`).join('');
+}
+async function openLoad(){
+  show('s-load');
+  const el = document.getElementById('loadList');
+  el.innerHTML='<p style="color:#d9d2ff">Wird gesucht …</p>';
+  const all = await cloudSaveList();
+  if(!all){ el.innerHTML='<p style="color:#d9d2ff">'+(FB_MSG||'Keine Verbindung.')+'</p>'; return; }
+  const rows = Object.entries(all).map(([k,v])=>{ let d=null; try{ d=fixSave(JSON.parse(v.daten)); }catch(e){}
+      return d && d.team.length ? {k,d,stand:v.stand} : null; }).filter(Boolean).sort((a,b)=>b.stand-a.stand);
+  if(!rows.length){ el.innerHTML='<p style="color:#d9d2ff">Noch kein Spielstand gesichert.</p>'; return; }
+  el.innerHTML = rows.map(r=>`<div class="bl" style="cursor:pointer" onclick="restoreCloud('${r.k}')">
+      ${monSVG(makeMon(r.d.team[0].fam, r.d.team[0].level),40)}
+      <div class="nm">${r.d.name}<small>${r.d.badges.length} Orden · ${r.d.team.length} Monster</small></div>
+      <div class="pt">laden</div></div>`).join('');
+}
+async function restoreCloud(key){
+  const all = await cloudSaveList();
+  if(!all || !all[key]){ toast('Nicht gefunden'); return; }
+  try{ G = fixSave(JSON.parse(all[key].daten)); await saveGame(); toast('Spielstand geladen'); renderMap(); show('s-map'); }
+  catch(e){ toast('Spielstand ist beschädigt'); }
+}
+
+/* ============ BILDSCHIRME ============ */
+function show(id){
+  stopSprich();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  window.scrollTo(0,0);
+}
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),1700); }
+
+let chosenStarter=null;
+const STARTER_OPTIONS=['silb','trenn','dehn'];
+document.getElementById('titleMon').innerHTML = monSVG(makeMon('meister',10),110);
+
+(async function boot(){
+  const s = await loadSave();
+  if(s){ const b=document.getElementById('btnContinue'); b.style.display='block'; b.textContent='Weiterspielen als '+s.name; }
+})();
+
+function newGame(){
+  G = blankGame(); chosenStarter=null;
+  document.getElementById('starterBox').innerHTML = STARTER_OPTIONS.map(f=>{
+    const m = makeMon(f,1);
+    return `<div class="starter" data-f="${f}" onclick="pickStarter('${f}')">${monSVG(m,80)}<b>${m.name}</b><small>${m.el}</small></div>`;
+  }).join('');
+  document.getElementById('btnGo').disabled = true;
+  document.getElementById('trainerName').value = '';
+  show('s-start');
+}
+function pickStarter(f){ chosenStarter=f;
+  document.querySelectorAll('.starter').forEach(el=>el.classList.toggle('sel', el.dataset.f===f));
+  document.getElementById('btnGo').disabled=false; }
+function confirmStarter(){
+  G.name = document.getElementById('trainerName').value.trim() || 'Trainer';
+  G.team = [{fam:chosenStarter, level:1, xp:0}];
+  G.dex = [chosenStarter]; G.active = 0;
+  saveGame(); renderMap(); show('s-map');
+  if(!G.gesehen) startIntro(false);
+}
+async function continueGame(){
+  const s = await loadSave();
+  if(!s){ toast('Kein Spielstand gefunden'); return; }
+  G = s; renderMap(); show('s-map');
+}
+
+/* ============ KARTE ============ */
+function renderMap(){
+  document.getElementById('mapName').textContent = G.name;
+  document.getElementById('mapBadges').textContent = G.badges.length+' von '+ARENAS.length+' Orden · '+punkte()+' Punkte';
+  document.getElementById('arenaList').innerHTML = ARENAS.map((a,i)=>{
+    const done = G.badges.includes(a.id), locked = i > G.arena;
+    return `<div class="${done?'arena done':(locked?'arena locked':'arena')}" ${locked?'':`onclick="enterArena(${i})"`}>
+      <div class="no">${String(i+1).padStart(2,'0')}</div>
+      ${monSVG(makeMon(a.fam, done?10:1),40)}
+      <div class="t"><b>${a.title}</b><small>${a.sub}</small></div>
+      <div class="badge">${locked?'🔒':(done?a.badge:'▶')}</div></div>`;
+  }).join('');
+  renderWorld(); setView(VIEW); renderOpts();
+  renderTeamRow();
+  const t = G.team[G.active], e = evoInfo(t), m = makeMon(t.fam,t.level);
+  document.getElementById('evoHint').innerHTML = e.fertig
+    ? `<b style="color:var(--gold)">${m.name}</b> hat die höchste Entwicklungsstufe erreicht.`
+    : `<b style="color:var(--lime)">${m.name}</b> braucht noch <b>${e.rest} EP</b> bis <b>${e.next}</b>
+       <div class="evobar" style="max-width:240px;margin:5px auto 0"><i style="width:${e.pct}%"></i></div>`;
+}
+function renderTeamRow(){
+  document.getElementById('teamRow').innerHTML = G.team.map((t,i)=>{
+    const m = makeMon(t.fam,t.level), e = evoInfo(t);
+    return `<div class="slot ${i===G.active?'act':''}" onclick="setActive(${i})">
+      ${monBox(m,40)}<b>${m.name}</b><small>Lv ${t.level}${e.fertig?' ★':''}</small>
+      <div class="evobar"><i style="width:${e.pct}%"></i></div></div>`;
+  }).join('');
+}
+function setActive(i){ G.active=i; renderMap(); saveGame(); }
+
+/* ============ EINSTELLUNGEN: HILFE, AUDIO, MIX ============ */
+const OPT_KEY = 'wortmonster-opt';
+let OPT = {hilfe:true, audio:false, mix:false};
+try{ const t = localStorage.getItem(OPT_KEY); if(t) OPT = Object.assign(OPT, JSON.parse(t)); }catch(e){}
+function saveOpt(){ try{ localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); }catch(e){} }
+
+const OPT_INFO = [
+  {k:'hilfe', ic:'💡', t:'Hilfemodus',  d:'Vor jedem Arenakampf werden die Regeln erklärt.'},
+  {k:'audio', ic:'🔊', t:'Audiomodus',  d:'Erklärungen werden zusätzlich vorgelesen.'},
+  {k:'mix',   ic:'🎲', t:'Mix-Modus',   d:'Aufgaben aus allen freigeschalteten Arenen gemischt.'}
+];
+function renderOpts(){
+  const html = OPT_INFO.map(o=>`<div class="optRow ${OPT[o.k]?'on':''}" onclick="toggleOpt('${o.k}')">
+      <div class="ic">${o.ic}</div>
+      <div class="tx"><b>${o.t}</b><small>${o.d}</small></div>
+      <div class="sw"><i></i></div></div>`).join('');
+  ['optsTitel','optsKarte'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML = html; });
+}
+function toggleOpt(k){
+  OPT[k] = !OPT[k]; saveOpt(); renderOpts();
+  if(k==='audio'){ if(OPT.audio) sprich('Der Audiomodus ist eingeschaltet. Ich lese dir die Erklärungen jetzt vor.'); else stopSprich(); }
+  if(k==='mix') toast(OPT.mix ? 'Mix-Modus an: bunt gemischte Aufgaben' : 'Mix-Modus aus');
+}
+
+/* ---- Vorlesen ---- */
+function sprichBar(){ return typeof window!=='undefined' && 'speechSynthesis' in window; }
+function stopSprich(){ try{ window.speechSynthesis.cancel(); }catch(e){} }
+function sprich(text, erzwingen){
+  if(!sprichBar()) return;
+  if(!OPT.audio && !erzwingen) return;
+  try{
+    stopSprich();
+    const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim());
+    u.lang = 'de-DE'; u.rate = .92; u.pitch = 1.05;
+    const v = window.speechSynthesis.getVoices().find(x=>x.lang && x.lang.toLowerCase().startsWith('de'));
+    if(v) u.voice = v;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ---- Regel-Tafel vor dem Kampf ---- */
+let REGEL_I = 0;
+function enterArena(i){
+  if(!OPT.hilfe) return startArena(i);
+  REGEL_I = i;
+  const a = ARENAS[i], m = makeMon(a.fam, 1);
+  document.getElementById('regelMon').innerHTML = monBox(m, 96);
+  document.getElementById('regelTitel').textContent = a.title;
+  document.getElementById('regelSub').textContent =
+    OPT.mix ? 'Mix-Modus: Hier kommen Aufgaben aus allen freigeschalteten Arenen. Zuerst die Regel dieser Arena:'
+            : a.sub;
+  document.getElementById('regelListe').innerHTML = (a.regel||[a.sub]).map(r=>`<li>${r}</li>`).join('');
+  document.getElementById('regelTrick').innerHTML = `<b>Trick:</b> ${a.hilfe}`;
+  show('s-regel');
+  if(OPT.audio) setTimeout(()=>regelVorlesen(), 350);
+}
+function regelText(a){
+  return a.title + '. ' + (a.regel||[a.sub]).join(' ') + ' Trick: ' + a.hilfe;
+}
+function regelVorlesen(){
+  if(!sprichBar()){ toast('Vorlesen geht auf diesem Gerät leider nicht'); return; }
+  sprich(regelText(ARENAS[REGEL_I]), true);
+}
+
+/* ============ WELTKARTE ============ */
+let VIEW = 'karte';
+const MAP_COLS = [70, 180, 290], MAP_ROW_H = 118, MAP_TOP = 66;
+function nodePos(i){
+  const row = Math.floor(i/3), inRow = i%3;
+  const x = row % 2 === 0 ? MAP_COLS[inRow] : MAP_COLS[2-inRow];
+  return {x, y: MAP_TOP + row*MAP_ROW_H};
+}
+function setView(v){
+  VIEW = v;
+  document.getElementById('tabKarte').classList.toggle('on', v==='karte');
+  document.getElementById('tabListe').classList.toggle('on', v==='liste');
+  document.getElementById('worldMap').style.display  = v==='karte' ? 'block' : 'none';
+  document.getElementById('arenaList').style.display = v==='liste' ? 'grid'  : 'none';
+}
+function mapClick(i){
+  if(i > G.arena){ toast('Diese Arena ist noch gesperrt'); return; }
+  enterArena(i);
+}
+function renderWorld(){
+  const rows = Math.ceil(ARENAS.length/3);
+  const H = MAP_TOP + (rows-1)*MAP_ROW_H + 78;
+
+  // Weg von Arena zu Arena
+  let weg = '';
+  for(let i=0;i<ARENAS.length-1;i++){
+    const a = nodePos(i), b = nodePos(i+1);
+    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2 + (a.y===b.y ? 0 : 8);
+    weg += `${i===0?`M ${a.x} ${a.y}`:''} Q ${mx} ${my} ${b.x} ${b.y} `;
+  }
+
+  // Landschaft im Hintergrund
+  let deko = '';
+  for(let r=0;r<rows;r++){
+    const y = MAP_TOP + r*MAP_ROW_H;
+    deko += `<ellipse cx="${r%2?300:60}" cy="${y+60}" rx="86" ry="34" fill="#1b1550" opacity=".8"/>`;
+    deko += `<circle cx="${r%2?40:330}" cy="${y+24}" r="3" fill="#fff" opacity=".35"/>`;
+    deko += `<circle cx="${r%2?300:70}" cy="${y-14}" r="2" fill="#fff" opacity=".25"/>`;
+  }
+
+  const nodes = ARENAS.map((a,i)=>{
+    const p = nodePos(i);
+    const done = G.badges.includes(a.id), locked = i > G.arena;
+    const mon = makeMon(a.fam, done ? 10 : 1);
+    const ring = done ? 'var(--gold)' : (locked ? '#3a3170' : 'var(--lime)');
+    const kurz = a.title.replace('-Arena','').replace(' Arena','');
+    const status = locked ? '🔒' : (done ? a.badge : '▶');
+    // Monster-SVG in die Karte einbetten
+    const inner = monSVG(mon, 60).replace('class="mon idle"','class="mon"')
+                   .replace('<svg ', `<svg x="${p.x-30}" y="${p.y-32}" `);
+    return `<g onclick="mapClick(${i})" style="cursor:${locked?'default':'pointer'};opacity:${locked?.42:1}">
+      <circle cx="${p.x}" cy="${p.y}" r="40" fill="#1e1760" stroke="${ring}" stroke-width="${done?4:3}"/>
+      ${done?`<circle cx="${p.x}" cy="${p.y}" r="46" fill="none" stroke="var(--gold)" stroke-width="1.5" opacity=".5"/>`:''}
+      ${inner}
+      <circle cx="${p.x-30}" cy="${p.y-28}" r="13" fill="#0f0a35" stroke="#5645cf" stroke-width="2"/>
+      <text x="${p.x-30}" y="${p.y-24}" text-anchor="middle" font-size="12" font-weight="700"
+        font-family="Space Grotesk,sans-serif" fill="#b9aef7">${i+1}</text>
+      <text x="${p.x+28}" y="${p.y-22}" text-anchor="middle" font-size="17">${status}</text>
+      <text x="${p.x}" y="${p.y+56}" text-anchor="middle" font-size="11" font-weight="700"
+        font-family="Baloo 2,sans-serif" fill="${done?'var(--gold)':'#cdc4ff'}">${kurz}</text>
+      <text x="${p.x}" y="${p.y+68}" text-anchor="middle" font-size="9"
+        font-family="Baloo 2,sans-serif" fill="#8f83e0">${mon.name} · Stufe ${mon.stage}/3</text>
+    </g>`;
+  }).join('');
+
+  document.getElementById('worldMap').innerHTML =
+   `<svg viewBox="0 0 360 ${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="himmel" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#241c62"/><stop offset="100%" stop-color="#120e30"/></linearGradient></defs>
+      <rect x="0" y="0" width="360" height="${H}" fill="url(#himmel)" rx="16"/>
+      ${deko}
+      <path d="${weg}" fill="none" stroke="var(--gold)" stroke-width="5" stroke-linecap="round"
+        stroke-dasharray="2 14" opacity=".55"/>
+      ${nodes}
+      <text x="180" y="26" text-anchor="middle" font-size="14" font-weight="800"
+        font-family="Baloo 2,sans-serif" fill="var(--cyan)">Tippe ein Monster an und kämpfe!</text>
+    </svg>`;
+}
+
+/* ============ KAMPF ============ */
+let B = null;
+function avgLevel(){ return Math.round(G.team.reduce((s,t)=>s+t.level,0)/G.team.length); }
+function hpClass(r){ return r>.5?'':(r>.22?'mid':'low'); }
+
+function startArena(i){
+  const a = ARENAS[i];
+  B = {arenaIndex:i, arena:a, stage:0, asked:[], enemy:null, playerHP:0, playerMax:0};
+  nextEnemy();
+}
+function nextEnemy(){
+  const a = B.arena;
+  const base = Math.max(1, Math.min(avgLevel(), 1 + Math.floor(B.arenaIndex/2)));
+  const lvl = Math.max(1, [base, base+1, base+3][B.stage]);
+  B.enemy = {mon:makeMon(a.fam,lvl), hp:maxHP(lvl), max:maxHP(lvl), boss:B.stage===2};
+  const p = G.team[G.active];
+  B.playerMax = maxHP(p.level);
+  if(B.stage===0) B.playerHP = B.playerMax;
+  renderBattle(); askQuestion(); show('s-battle');
+}
+function renderBattle(){
+  const p = G.team[G.active], pm = makeMon(p.fam,p.level), e = evoInfo(p);
+  const pr = B.playerHP/B.playerMax, er = B.enemy.hp/B.enemy.max;
+  document.getElementById('sidePlayer').innerHTML = `
+    <div class="nameplate"><b>${pm.name}</b><small>Lv ${p.level} · Stufe ${pm.stage}/3</small>
+      <div class="hpbar"><div class="hpfill ${hpClass(pr)}" id="hpP" style="width:${pr*100}%"></div></div>
+      ${e.fertig?'<div class="evoline">höchste Stufe ★</div>'
+        :`<div class="evoline">noch ${e.rest} EP bis ${e.next}<div class="evobar"><i style="width:${e.pct}%"></i></div></div>`}
+    </div><div id="monP">${monBox(pm,96)}</div>`;
+  document.getElementById('sideEnemy').innerHTML = `
+    <div class="nameplate"><b>${B.enemy.boss?'★ ':''}${B.enemy.mon.name}</b>
+      <small>Lv ${B.enemy.mon.level} · ${B.enemy.boss?'Arenaleiter':'wild'}</small>
+      <div class="hpbar"><div class="hpfill ${hpClass(er)}" id="hpE" style="width:${er*100}%"></div></div></div>
+    <div id="monE">${monBox(B.enemy.mon,96)}</div>`;
+}
+function askQuestion(){
+  // Im Mix-Modus kommt jede Frage aus einer zufaelligen freigeschalteten Arena
+  let a = B.arena;
+  if(OPT.mix){
+    const offen = ARENAS.slice(0, Math.max(1, G.arena+1)).filter(x=>x.id!=='meister');
+    if(offen.length) a = offen[Math.floor(Math.random()*offen.length)];
+  }
+  B.qArena = a;
+  let q, key;
+  if(a.gen){ q = GEN[a.gen](); key = 'g'+textHash(q[0]); }
+  else{
+    if(B.asked.length >= a.qs.length) B.asked = [];
+    let idx; do{ idx = Math.floor(Math.random()*a.qs.length); }while(B.asked.includes(idx));
+    B.asked.push(idx); q = a.qs[idx]; key = idx;
+  }
+  B.q = q; B.key = key;
+  document.getElementById('qbox').innerHTML = `
+    <span class="tag">${OPT.mix?'🎲 ':''}${a.title}</span>
+    <div class="q">${q[0]}</div>
+    <div class="opts">${q[1].map((o,i)=>`<button class="opt" onclick="answer(${i})">${o}</button>`).join('')}</div>`;
+}
+function answer(i){
+  const q = B.q, right = i === q[2];
+  document.querySelectorAll('.opt').forEach((b,n)=>{ b.disabled=true;
+    if(n===i) b.classList.add(right?'right':'wrong'); if(!right && n===q[2]) b.classList.add('right'); });
+
+  trackAnswer((B.qArena||B.arena).id, B.key, right, q[0]);
+  saveGame();
+
+  const p = G.team[G.active];
+  if(right){
+    G.stats.richtig++;
+    B.enemy.hp = Math.max(0, B.enemy.hp - (14 + p.level*4 + Math.floor(Math.random()*8)));
+    const mp = document.querySelector('#monP .mon'); if(mp) mp.classList.add('attack');
+    setTimeout(()=>{ const me=document.querySelector('#monE .mon'); if(me) me.classList.add('hit'); },180);
+  } else {
+    G.stats.falsch++;
+    B.playerHP = Math.max(0, B.playerHP - (10 + B.enemy.mon.level*3));
+    const me = document.querySelector('#monE .mon'); if(me) me.classList.add('attack');
+    setTimeout(()=>{ const mp=document.querySelector('#monP .mon'); if(mp) mp.classList.add('hit'); },180);
+  }
+  const er = B.enemy.hp/B.enemy.max, pr = B.playerHP/B.playerMax;
+  const hpE=document.getElementById('hpE'), hpP=document.getElementById('hpP');
+  hpE.style.width=er*100+'%'; hpE.className='hpfill '+hpClass(er);
+  hpP.style.width=pr*100+'%'; hpP.className='hpfill '+hpClass(pr);
+
+  const proceed = ()=>{ if(B.enemy.hp<=0) return winFight(); if(B.playerHP<=0) return loseFight(); askQuestion(); };
+  if(right){
+    const tip=document.createElement('div'); tip.className='tip'; tip.innerHTML=`<b>Treffer!</b> ${q[3]}`;
+    document.getElementById('qbox').appendChild(tip);
+    setTimeout(proceed,1500);
+  } else setTimeout(()=>showFehler(q,i,proceed),550);
+}
+let FEHLER_TEXT='';
+function fehlerVorlesen(){ sprich(FEHLER_TEXT, true); }
+function showFehler(q, gewaehlt, weiter){
+  const qa = B.qArena || B.arena;
+  const ov=document.createElement('div'); ov.className='modal';
+  ov.innerHTML = `<div class="modalBox">
+    <h2>Das war leider falsch</h2>
+    <div style="font-size:15px;color:#5a4f86">${qa.title} · ${qa.sub}</div>
+    <div class="qtext">${q[0]}</div>
+    <div class="answerLine no"><span>✗</span><span>Du hast gewählt: <u>${q[1][gewaehlt]}</u></span></div>
+    <div class="answerLine yes"><span>✓</span><span>Richtig ist: <u>${q[1][q[2]]}</u></span></div>
+    <div class="why"><b>Warum?</b>${q[3]}</div>
+    <div class="how"><b>So machst du es beim nächsten Mal richtig</b>${qa.hilfe}</div>
+    <button class="btn speak" onclick="fehlerVorlesen()">🔊 Noch einmal vorlesen</button>
+    <button class="btn" id="fehlerOk">OK, verstanden</button></div>`;
+  document.body.appendChild(ov);
+  FEHLER_TEXT = 'Das war leider falsch. Richtig ist: ' + q[1][q[2]] + '. ' + q[3] + ' ' + qa.hilfe;
+  const btn = ov.querySelector('#fehlerOk'); btn.focus();
+  btn.onclick = ()=>{ stopSprich(); ov.remove(); weiter(); };
+  if(OPT.audio) setTimeout(()=>sprich(FEHLER_TEXT), 300);
+}
+function winFight(){
+  G.stats.kaempfe++;
+  const p = G.team[G.active], gain = B.enemy.boss?70:40, before = p.level;
+  p.xp += gain;
+  while(p.xp >= xpBis(p.level)){ p.xp -= xpBis(p.level); p.level++; }
+  const evolved = (before<5 && p.level>=5) || (before<10 && p.level>=10);
+
+  let caught = false;
+  if(!B.enemy.boss && G.team.length<6 && !G.team.some(t=>t.fam===B.enemy.mon.fam)){
+    G.team.push({fam:B.enemy.mon.fam, level:Math.max(1,B.enemy.mon.level), xp:0});
+    if(!G.dex.includes(B.enemy.mon.fam)) G.dex.push(B.enemy.mon.fam);
+    caught = true;
+  }
+  if(B.enemy.boss && !G.dex.includes(B.enemy.mon.fam)) G.dex.push(B.enemy.mon.fam);
+  if(evolved) return showEvolution(p, gain, caught);
+  afterWin(gain, caught);
+}
+function showEvolution(p, gain, caught){
+  const m = makeMon(p.fam,p.level), alt = FAMILIES[p.fam].names[m.stage-2];
+  const ov=document.createElement('div'); ov.className='evo';
+  ov.innerHTML = `<h2>Entwicklung!</h2><div class="flash">${monBox(m,150)}</div>
+    <p style="font-size:20px;margin:0;color:#ded8ff">${alt} entwickelt sich zu <b style="color:var(--lime)">${m.name}</b>!</p>
+    <p style="margin:0;color:#a99ff0">Stufe ${m.stage} von 3 – jetzt deutlich größer und stärker.</p>
+    <button class="btn" style="max-width:280px" id="evoOk">Weiter</button>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#evoOk').onclick = ()=>{ ov.remove(); afterWin(gain,caught); };
+}
+function afterWin(gain, caught){
+  B.stage++;
+  const a = B.arena, p = G.team[G.active], e = evoInfo(p);
+  const evoText = e.fertig ? '' : `<p style="color:#b3a9f5">Noch <b style="color:var(--lime)">${e.rest} EP</b> bis zur Entwicklung zu ${e.next}.</p>`;
+  if(B.stage >= 3){
+    if(!G.badges.includes(a.id)) G.badges.push(a.id);
+    if(B.arenaIndex === G.arena) G.arena = Math.min(ARENAS.length-1, G.arena+1);
+    saveGame(); syncCloud();
+    const fertig = G.badges.length === ARENAS.length;
+    document.getElementById('resultCard').innerHTML = `
+      <h2>${a.badge} Orden gewonnen!</h2>
+      <div style="text-align:center">${monBox(makeMon(a.fam,10),120)}</div>
+      <p>Du hast die <b>${a.title}</b> geschafft.${caught?' Ein wildes Monster hat sich dir angeschlossen!':''} +${gain} EP.</p>
+      ${evoText}
+      ${fertig?'<p style="color:var(--gold);font-size:20px"><b>Du bist Wortmeister! Alle Orden sind deins.</b></p>':''}
+      <button class="btn" onclick="renderMap();show('s-map')">Zurück zur Karte</button>
+      <button class="btn gold" onclick="openBoard()">In die Bestenliste eintragen</button>`;
+  } else {
+    saveGame(); syncCloud();
+    document.getElementById('resultCard').innerHTML = `
+      <h2>Kampf gewonnen!</h2>
+      <p>+${gain} EP.${caught?' <b>Das Monster ist jetzt in deinem Team!</b>':''} Noch ${3-B.stage} Gegner bis zum Orden.</p>
+      ${evoText}
+      <div class="row"><button class="btn" onclick="heal();nextEnemy()">Weiterkämpfen</button>
+      <button class="btn ghost" onclick="renderMap();show('s-map')">Pause</button></div>`;
+  }
+  show('s-result');
+}
+function heal(){ B.playerHP = Math.min(B.playerMax, B.playerHP+25); }
+function loseFight(){
+  saveGame(); syncCloud();
+  document.getElementById('resultCard').innerHTML = `
+    <h2>Dein Monster ist erschöpft</h2>
+    <p>Kein Problem – es erholt sich sofort. Lies die Tipps noch einmal und probiere die Arena neu.</p>
+    <div class="row"><button class="btn" onclick="startArena(${B.arenaIndex})">Arena neu starten</button>
+    <button class="btn ghost" onclick="renderMap();show('s-map')">Zur Karte</button></div>`;
+  show('s-result');
+}
+
+/* ============ INTRO ============ */
+const INTRO=[
+ {mon:'silb',h:'Willkommen in der Wortwelt!',t:'Hier leben 30 Monster aus Buchstaben. Du bist Trainer und sammelst sie. Jedes Monster gehört zu einer Rechtschreibregel.'},
+ {mon:'trenn',h:'So kämpfst du',t:'Bei jedem Kampf kommt eine Frage. Deine Antwort ist dein Angriff: Ist sie richtig, trifft dein Monster. Ist sie falsch, wirst du getroffen – und bekommst alles erklärt.'},
+ {mon:'dopp',h:'Monster entwickeln',t:'Für Siege gibt es Erfahrungspunkte. Auf Level 5 und Level 10 entwickelt sich dein Monster und wird sichtbar größer. Unter dem Monster siehst du immer, wie viele EP noch fehlen.'},
+ {mon:'meister',h:'30 Arenen, 30 Orden',t:'Schlage in jeder Arena zwei wilde Monster und den Arenaleiter. Dein Spielstand wird nach jeder Antwort gespeichert.'},
+ {mon:'laute',h:'Drei Schalter für dich',t:'Der Hilfemodus erklärt vor jedem Kampf die Regel. Der Audiomodus liest alles vor. Der Mix-Modus würfelt Aufgaben aus allen Arenen durcheinander. Du findest sie auf dem Startbildschirm und auf der Karte.'}
+];
+let introPos=0, introManual=false;
+function startIntro(manual){
+  introManual=!!manual; introPos=0;
+  const ov=document.createElement('div'); ov.className='intro'; ov.id='introOv';
+  ov.innerHTML=`<div class="introBox"><div id="introMon"></div><h2 id="introH"></h2><p id="introT"></p>
+    <div class="dots" id="introDots"></div><button class="btn" id="introNext"></button>
+    <button class="skip" onclick="closeIntro()">Überspringen</button></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#introNext').onclick = introNext;
+  paintIntro();
+}
+function paintIntro(){
+  const s = INTRO[introPos];
+  document.getElementById('introMon').innerHTML = monSVG(makeMon(s.mon, introPos>=2?10:1),95);
+  document.getElementById('introH').textContent = s.h;
+  document.getElementById('introT').textContent = s.t;
+  document.getElementById('introDots').innerHTML = INTRO.map((_,i)=>`<i class="${i===introPos?'on':''}"></i>`).join('');
+  document.getElementById('introNext').textContent = introPos===INTRO.length-1 ? "Los geht's!" : 'Weiter';
+}
+function introNext(){ if(introPos<INTRO.length-1){ introPos++; paintIntro(); } else closeIntro(); }
+function closeIntro(){ const o=document.getElementById('introOv'); if(o) o.remove();
+  if(!introManual && G){ G.gesehen=true; saveGame(); } }
+
+/* ============ ELTERNBEREICH ============ */
+function openParent(){
+  document.getElementById('pinCard').style.display='block';
+  document.getElementById('parentBody').innerHTML='';
+  document.getElementById('pinInput').value='';
+  document.getElementById('pinMsg').textContent='';
+  show('s-parent');
+}
+function checkPin(){
+  if(document.getElementById('pinInput').value.trim()===ELTERN_PIN){
+    document.getElementById('pinCard').style.display='none'; renderParent();
+  } else document.getElementById('pinMsg').textContent='PIN stimmt nicht.';
+}
+async function renderParent(){
+  const body=document.getElementById('parentBody');
+  body.innerHTML='<div class="card"><p>Auswertung wird geladen …</p></div>';
+  let quellen=[];
+  const lokal = G || await loadSave();
+  if(lokal) quellen.push({name:lokal.name, rules:lokal.stats.rules||{}, qs:lokal.stats.qs||{}, lokal:true});
+  const cloud = await fetchSpieler();
+  if(cloud) Object.values(cloud).forEach(s=>{ if(s&&s.name&&!quellen.some(q=>q.name===s.name))
+      quellen.push({name:s.name, rules:s.rules||{}, qs:s.qs||{}}); });
+  if(!quellen.length){ body.innerHTML='<div class="card"><h2>Noch keine Daten</h2><p>Sobald gespielt wurde, erscheint hier die Auswertung.</p></div>'; return; }
+  body.innerHTML = quellen.map(parentCard).join('') +
+    (FB_OK?'':'<div class="card"><p style="margin:0;font-size:14px">Ohne Datenbankverbindung wird nur dieses Gerät ausgewertet.</p></div>');
+}
+function parentCard(src){
+  let ges=0, gesF=0;
+  const zeilen = ARENAS.map(a=>{
+    const r = src.rules[a.id] || {r:0,f:0}, n = r.r+r.f;
+    ges+=n; gesF+=r.f;
+    const quote = n ? Math.round(r.r/n*100) : null;
+    let cls='ok', label='sitzt';
+    if(quote===null){ cls='mid'; label='noch nicht geübt'; }
+    else if(quote<60){ cls='bad'; label='üben'; }
+    else if(quote<80){ cls='mid'; label='fast'; }
+    const col = quote===null?'#4a3ab8':(quote<60?'var(--red)':quote<80?'var(--gold)':'var(--lime)');
+    let hint='';
+    if(quote!==null && quote<90){
+      const hart = Object.entries(src.qs).filter(([k,v])=>k.split('~')[0]===a.id && v.f>0)
+        .sort((x,y)=>y[1].f-x[1].f).slice(0,2);
+      if(hart.length) hint = '<div class="hint">Hakt bei: '+hart.map(([k,v])=>
+        `<em>${v.t||k.split('~')[1]}</em> <span style="color:#9c92e8">(${v.f}× falsch)</span>`).join('<br>')+'</div>';
+    }
+    return `<div class="rule"><div class="top"><b>${a.title}<span class="pill ${cls}">${label}</span></b>
+      <span style="font-weight:800;color:${col}">${quote===null?'–':quote+'%'}</span></div>
+      <div style="font-size:12.5px;color:#a99ff0">${a.sub} · ${n} Aufgaben</div>
+      <div class="bar"><i style="width:${quote===null?0:quote}%;background:${col}"></i></div>${hint}</div>`;
+  }).join('');
+  const q = ges ? Math.round((ges-gesF)/ges*100) : 0;
+  return `<div class="card"><h2>${src.name}${src.lokal?' (dieses Gerät)':''}</h2>
+    <p>${ges} Aufgaben bearbeitet · <b style="color:var(--lime)">${q}% richtig</b>. Rot heißt: hier lohnt sich gemeinsames Üben.</p>
+    ${zeilen}</div>`;
+}
+
+/* ============ WORTDEX ============ */
+function renderDex(){
+  const alle = Object.keys(FAMILIES);
+  document.getElementById('dexCount').textContent = `${G.dex.length} von ${alle.length} Monstern entdeckt`;
+  document.getElementById('dexGrid').innerHTML = alle.map(f=>{
+    const known = G.dex.includes(f), m = makeMon(f, known?10:1);
+    return `<div class="dexItem ${known?'':'empty'}">${known?monBox(m,62):'<div style="font-size:40px">❔</div>'}
+      <b>${known?FAMILIES[f].names[0]:'???'}</b><small>${known?FAMILIES[f].el:'unbekannt'}</small></div>`;
+  }).join('');
+  document.getElementById('teamDetail').innerHTML = G.team.map(t=>{
+    const m = makeMon(t.fam,t.level), e = evoInfo(t);
+    return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">${monBox(m,54)}
+      <div style="flex:1"><div class="stat"><b>${m.name}</b><span>Level ${t.level} · Stufe ${m.stage}/3</span></div>
+      <div style="font-size:13px;color:#a99ff0">${m.el}</div>
+      <div style="font-size:13px;color:${e.fertig?'var(--gold)':'var(--cyan)'}">
+        ${e.fertig?'höchste Stufe erreicht ★':'noch '+e.rest+' EP bis '+e.next}</div>
+      <div class="evobar"><i style="width:${e.pct}%"></i></div></div></div>`;
+  }).join('') + `<div class="stat"><span>Richtige Antworten</span><b>${G.stats.richtig}</b></div>
+    <div class="stat"><span>Falsche Antworten</span><b>${G.stats.falsch}</b></div>
+    <div class="stat"><span>Punkte</span><b>${punkte()}</b></div>`;
+}
+
+/* Schalter zeichnen, sobald alles geladen ist */
+renderOpts();
+if(sprichBar() && window.speechSynthesis.onvoiceschanged !== undefined){
+  window.speechSynthesis.onvoiceschanged = ()=>{};   // Stimmen im Browser vorladen
+}
+</script>
+</body>
+</html>
